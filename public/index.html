@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão de Casa | Controle Inteligente de Contas & Finanças</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN para gráficos interativos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Firebase SDK (Google Cloud Firestore para sincronização em tempo real) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- HEADER -->
+  <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      
+      <!-- Logo & Título -->
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            Gestão de Casa
+          </h1>
+          <p class="text-xs text-slate-400">Painel Financeiro & Controle de Contas</p>
+        </div>
+      </div>
+
+      <!-- Indicadores de Status & Data -->
+      <div class="flex items-center gap-4">
+        <div id="connectionBadge" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="connectionText">Servidor Ativo</span>
+        </div>
+        <div class="text-right">
+          <span id="currentDateDisplay" class="text-xs font-semibold text-slate-300 capitalize">--</span>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- CARDS DE RESUMO FINANCEIRO -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      
+      <!-- Card 1: Total de Receitas -->
+      <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group hover:border-emerald-500/40 transition-smooth">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total de Receitas</span>
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="text-2xl font-extrabold text-emerald-400" id="cardTotalIncome">R$ 0,00</div>
+        <p class="text-xs text-slate-500 mt-2 flex items-center gap-1">
+          <span id="countIncomes">0</span> fontes cadastradas
+        </p>
+      </div>
+
+      <!-- Card 2: Total de Contas -->
+      <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group hover:border-rose-500/40 transition-smooth">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total de Contas</span>
+          <div class="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="text-2xl font-extrabold text-rose-400" id="cardTotalExpenses">R$ 0,00</div>
+        <p class="text-xs text-slate-500 mt-2 flex items-center gap-1">
+          <span id="countExpenses">0</span> contas cadastradas
+        </p>
+      </div>
+
+      <!-- Card 3: Saldo Restante -->
+      <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group hover:border-blue-500/40 transition-smooth">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Saldo Líquido</span>
+          <div class="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="text-2xl font-extrabold text-blue-400" id="cardBalance">R$ 0,00</div>
+        <p class="text-xs text-slate-500 mt-2" id="balanceStatusText">Disponível no mês</p>
+      </div>
+
+      <!-- Card 4: Status Pagamento -->
+      <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group hover:border-amber-500/40 transition-smooth">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Status das Contas</span>
+          <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="flex items-baseline justify-between">
+          <div>
+            <div class="text-sm font-bold text-emerald-400">Pagas: <span id="cardPaidAmount">R$ 0,00</span></div>
+            <div class="text-sm font-bold text-amber-400 mt-1">Pendentes: <span id="cardPendingAmount">R$ 0,00</span></div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- DESTAQUE PRINCIPAL: BARRA DE PORCENTAGEM DE GASTOS EM RELAÇÃO À RECEITA -->
+    <section class="glass-panel p-6 sm:p-8 rounded-3xl relative overflow-hidden border border-slate-800" id="percentageContainer">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <div class="flex items-center gap-3">
+            <button 
+              type="button" 
+              id="openChartBtn" 
+              title="Clique para abrir o gráfico em barras de débitos x receita"
+              class="group relative inline-flex items-center gap-2 p-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 hover:border-indigo-500/60 shadow-lg shadow-indigo-500/10 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <svg class="w-5 h-5 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+              <span class="text-xs font-semibold pr-1 hidden sm:inline-block">Ver Gráfico</span>
+              <span class="flex h-2 w-2 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              </span>
+            </button>
+            <h2 class="text-lg sm:text-xl font-bold text-white">Comprometimento da Renda</h2>
+          </div>
+          <p class="text-sm text-slate-400 mt-1">
+            Porcentagem dos gastos em relação à receita total da casa
+          </p>
+        </div>
+
+        <!-- Indicador Numérico Grande e Badge de Nível -->
+        <div class="flex items-center gap-4 bg-slate-900/80 px-5 py-3 rounded-2xl border border-slate-800">
+          <div class="text-right">
+            <div class="text-3xl sm:text-4xl font-black tracking-tight" id="percentageDisplay">0%</div>
+            <div class="text-xs text-slate-400 font-medium">da receita gasta</div>
+          </div>
+          <div id="percentageBadge" class="px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            Excelente
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Progresso Visual Estilizada -->
+      <div class="space-y-3">
+        <div class="w-full h-6 sm:h-7 bg-slate-900 rounded-2xl overflow-hidden p-1 border border-slate-800 shadow-inner">
+          <div id="progressBar" class="h-full rounded-xl progress-bar-fill bg-emerald-500 flex items-center justify-end pr-2 text-[10px] font-black text-slate-950 shadow-md" style="width: 0%;">
+            <span id="progressBarInsideText" class="opacity-0 transition-opacity duration-300"></span>
+          </div>
+        </div>
+
+        <!-- Marcadores de Escala -->
+        <div class="flex justify-between text-[11px] font-semibold text-slate-500 px-1">
+          <span>0%</span>
+          <span class="text-emerald-500">25% (Ideal)</span>
+          <span class="text-blue-400">50% (Equilibrado)</span>
+          <span class="text-amber-400">75% (Atenção)</span>
+          <span class="text-rose-500">100% (Limite)</span>
+        </div>
+      </div>
+
+      <!-- Mensagem de Análise Inteligente -->
+      <div id="analysisBox" class="mt-6 p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-start gap-3">
+        <div id="analysisIcon" class="mt-0.5 text-emerald-400 flex-shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <div class="text-xs sm:text-sm text-slate-300" id="analysisText">
+          Calculando diagnóstico financeiro...
+        </div>
+      </div>
+    </section>
+
+    <!-- GRID EM 2 COLUNAS: RECEITAS (ESQUERDA) VS CONTAS A PAGAR (DIREITA) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+      <!-- COLUNA 1: RECEITAS (4 colunas no desktop) -->
+      <section class="lg:col-span-5 space-y-6">
+        
+        <!-- Formulário de Receitas -->
+        <div class="glass-panel p-6 rounded-3xl border border-slate-800">
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-800/80">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-bold text-white text-base">Adicionar Receita</h3>
+              <p class="text-xs text-slate-400">Salários, rendas extras e ganhos</p>
+            </div>
+          </div>
+
+          <form id="incomeForm" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Descrição da Renda *</label>
+              <input 
+                type="text" 
+                id="incomeDescription" 
+                placeholder="Ex: Salário, Freelance, Pensão..." 
+                required
+                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+              >
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Valor (R$) *</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  min="0.01" 
+                  id="incomeAmount" 
+                  placeholder="0,00" 
+                  required
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-sm text-emerald-400 font-bold placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                >
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Categoria</label>
+                <select 
+                  id="incomeCategory" 
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 transition-colors"
+                >
+                  <option value="Salário">Salário</option>
+                  <option value="Freelance">Freelance</option>
+                  <option value="Extra">Renda Extra</option>
+                  <option value="Investimentos">Investimentos</option>
+                  <option value="Outros">Outros</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Data de Recebimento</label>
+              <input 
+                type="date" 
+                id="incomeDate" 
+                class="w-full px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 transition-colors"
+              >
+            </div>
+
+            <button 
+              type="submit" 
+              class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg shadow-emerald-600/30 transition-smooth flex items-center justify-center gap-2"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              Cadastrar Receita
+            </button>
+          </form>
+        </div>
+
+        <!-- Lista de Receitas Cadastradas -->
+        <div class="glass-panel p-6 rounded-3xl border border-slate-800">
+          <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/80">
+            <h3 class="font-bold text-white text-base">Receitas Ativas</h3>
+            <span id="incomeCountBadge" class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 font-semibold">0</span>
+          </div>
+
+          <!-- Container da Lista de Receitas -->
+          <div id="incomeList" class="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+            <!-- Itens inseridos via JS -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- COLUNA 2: CONTAS E DESPESAS (7 colunas no desktop) -->
+      <section class="lg:col-span-7 space-y-6">
+        
+        <!-- Formulário de Cadastro de Contas -->
+        <div class="glass-panel p-6 rounded-3xl border border-slate-800">
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-slate-800/80">
+            <div class="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-bold text-white text-base">Cadastrar Nova Conta</h3>
+              <p class="text-xs text-slate-400">Despesas fixas, boletos e compras</p>
+            </div>
+          </div>
+
+          <form id="expenseForm" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+              <div class="sm:col-span-7">
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Descrição da Conta *</label>
+                <input 
+                  type="text" 
+                  id="expenseDescription" 
+                  placeholder="Ex: Aluguel, Luz, Supermercado, Internet..." 
+                  required
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
+                >
+              </div>
+
+              <div class="sm:col-span-5">
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Valor da Conta (R$) *</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  min="0.01" 
+                  id="expenseAmount" 
+                  placeholder="0,00" 
+                  required
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-sm text-rose-400 font-bold placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
+                >
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Data de Vencimento *</label>
+                <input 
+                  type="date" 
+                  id="expenseDueDate" 
+                  required
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-rose-500 transition-colors"
+                >
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Categoria da Conta</label>
+                <select 
+                  id="expenseCategory" 
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-sm text-slate-200 focus:outline-none focus:border-rose-500 transition-colors"
+                >
+                  <option value="Moradia">🏠 Moradia (Aluguel, Condomínio)</option>
+                  <option value="Serviços">💡 Serviços (Luz, Água, Gás, Net)</option>
+                  <option value="Alimentação">🛒 Alimentação (Supermercado, Feira)</option>
+                  <option value="Cartão">💳 Cartão de Crédito</option>
+                  <option value="Transporte">🚗 Transporte (Combustível, App)</option>
+                  <option value="Saúde">💊 Saúde & Farmácia</option>
+                  <option value="Lazer">🍿 Lazer & Streaming</option>
+                  <option value="Outros">📦 Outros</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Novo Campo: Link de Pagamento Direto -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">
+                Link de Pagamento <span class="text-slate-500 font-normal">(Opcional: boleto, app do banco, fatura ou pix)</span>
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                  </svg>
+                </span>
+                <input 
+                  type="text" 
+                  id="expensePaymentUrl" 
+                  placeholder="Ex: nubank.com.br/pagar, link do boleto ou código" 
+                  class="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
+                >
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+              <label class="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" id="expensePaid" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700">
+                <span class="text-xs font-medium text-slate-300">Marcar esta conta como já paga</span>
+              </label>
+
+              <button 
+                type="submit" 
+                class="py-2.5 px-6 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm shadow-lg shadow-rose-600/30 transition-smooth flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Cadastrar Conta
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Lista e Gerenciamento de Contas -->
+        <div class="glass-panel p-6 rounded-3xl border border-slate-800">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-800/80">
+            <div>
+              <h3 class="font-bold text-white text-base">Contas do Mês</h3>
+              <p class="text-xs text-slate-400">Clique no ícone de checagem para alternar status ou na lixeira para excluir</p>
+            </div>
+
+            <!-- Filtros de Contas -->
+            <div class="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+              <button data-filter="all" class="filter-btn px-3 py-1 rounded-lg font-medium transition-colors bg-slate-800 text-white">Todas</button>
+              <button data-filter="pending" class="filter-btn px-3 py-1 rounded-lg font-medium transition-colors text-slate-400 hover:text-white">Pendentes</button>
+              <button data-filter="paid" class="filter-btn px-3 py-1 rounded-lg font-medium transition-colors text-slate-400 hover:text-white">Pagas</button>
+            </div>
+          </div>
+
+          <!-- Container da Lista de Contas -->
+          <div id="expenseList" class="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+            <!-- Itens inseridos dinamicamente -->
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- MODAL DO GRÁFICO DE BARRAS (DÉBITOS VS RECEITA) -->
+  <div id="chartModal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div class="glass-panel max-w-4xl w-full p-6 sm:p-8 rounded-3xl border border-slate-700/80 shadow-2xl relative space-y-6 my-auto">
+      
+      <!-- Cabeçalho do Modal -->
+      <div class="flex items-start justify-between gap-4 pb-4 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg sm:text-xl font-bold text-white">Gráfico de Débitos em Relação à Receita</h3>
+            <p class="text-xs sm:text-sm text-slate-400">Análise visual de proporcionalidade dos gastos sobre a renda familiar</p>
+          </div>
+        </div>
+
+        <button 
+          id="closeChartModalBtn" 
+          type="button" 
+          title="Fechar Gráfico"
+          class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Resumo Rápido das Métricas -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-emerald-500/30">
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Receita Base (100%)</span>
+          <div class="text-lg font-black text-emerald-400 mt-1" id="chartModalIncome">R$ 0,00</div>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-rose-500/30">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Débitos</span>
+            <span class="text-xs font-bold text-rose-400" id="chartModalExpensePercent">0%</span>
+          </div>
+          <div class="text-lg font-black text-rose-400 mt-1" id="chartModalExpense">R$ 0,00</div>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-blue-500/30">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Saldo Líquido</span>
+            <span class="text-xs font-bold text-blue-400" id="chartModalBalancePercent">0%</span>
+          </div>
+          <div class="text-lg font-black text-blue-400 mt-1" id="chartModalBalance">R$ 0,00</div>
+        </div>
+      </div>
+
+      <!-- Abas de Alternância de Visualização -->
+      <div class="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-2">
+        <button id="tabOverviewBtn" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors bg-indigo-600 text-white shadow-md">
+          📊 Comparativo Geral (Receita vs Débitos)
+        </button>
+        <button id="tabCategoriesBtn" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors text-slate-400 hover:text-white hover:bg-slate-800">
+          🏷️ Débitos por Categoria (% da Renda)
+        </button>
+        <button id="tabMonthlyBtn" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors text-slate-400 hover:text-white hover:bg-slate-800">
+          📅 Comparação Mensal
+        </button>
+      </div>
+
+      <!-- VISÃO 1: CANVAS GRÁFICO DE BARRAS COMPARATIVO GERAL -->
+      <div id="chartViewOverview" class="space-y-4">
+        <div class="h-64 sm:h-72 w-full relative">
+          <canvas id="mainBarChartCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- VISÃO 2: BARRAS DETALHADAS POR CATEGORIA DE DÉBITOS -->
+      <div id="chartViewCategories" class="space-y-3 hidden">
+        <p class="text-xs text-slate-400">
+          Veja quanto cada categoria de conta consome da sua receita total:
+        </p>
+        <div id="categoryBarsContainer" class="space-y-3 max-h-72 overflow-y-auto pr-1">
+          <!-- Inserido dinamicamente via JS -->
+        </div>
+      </div>
+
+      <!-- VISÃO 3: COMPARAÇÃO MENSAL (RECEITAS VS DÉBITOS MÊS A MÊS) -->
+      <div id="chartViewMonthly" class="space-y-4 hidden">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <p class="text-xs text-slate-400">
+            Evolução histórica comparativa entre <strong>Receitas</strong> e <strong>Débitos</strong> em cada mês:
+          </p>
+          <span class="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg self-start sm:self-auto">
+            📈 Comparativo de Meses
+          </span>
+        </div>
+
+        <!-- Canvas Gráfico de Barras Agrupadas por Mês -->
+        <div class="h-64 sm:h-72 w-full relative">
+          <canvas id="monthlyBarChartCanvas"></canvas>
+        </div>
+
+        <!-- Detalhamento Mês a Mês em Cards -->
+        <div class="space-y-2 pt-1">
+          <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Histórico Mensal Consolidado</h4>
+          <div id="monthlyBreakdownContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-48 overflow-y-auto pr-1">
+            <!-- Inserido dinamicamente via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Rodapé com Diagnóstico & Botão de Fechar -->
+      <div class="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p class="text-xs text-slate-400" id="chartModalFooterNote">
+          Os percentuais são recalculados automaticamente com base nas receitas e contas salvas.
+        </p>
+        <button 
+          id="closeChartBottomBtn" 
+          type="button" 
+          class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors self-end sm:self-auto"
+        >
+          Fechar Gráfico
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL DE EDIÇÃO DE CONTA -->
+  <div id="editExpenseModal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="glass-panel max-w-lg w-full p-6 sm:p-7 rounded-3xl border border-slate-700 shadow-2xl relative space-y-5 my-auto">
+      
+      <!-- Cabeçalho do Modal -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">Editar Conta</h3>
+            <p class="text-xs text-slate-400">Altere os dados, vencimento, valor ou link de pagamento</p>
+          </div>
+        </div>
+
+        <button 
+          id="closeEditModalBtn" 
+          type="button" 
+          title="Fechar"
+          class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Formulário de Edição -->
+      <form id="editExpenseForm" class="space-y-4">
+        <input type="hidden" id="editExpenseId">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Descrição da Conta *</label>
+          <input 
+            type="text" 
+            id="editExpenseDescription" 
+            required
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"
+          >
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Valor (R$) *</label>
+            <input 
+              type="number" 
+              step="0.01" 
+              min="0.01" 
+              id="editExpenseAmount" 
+              required
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm font-bold text-rose-400 focus:outline-none focus:border-indigo-500 transition-colors"
+            >
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Vencimento *</label>
+            <input 
+              type="date" 
+              id="editExpenseDueDate" 
+              required
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
+            >
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Categoria</label>
+          <select 
+            id="editExpenseCategory" 
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
+          >
+            <option value="Moradia">🏠 Moradia (Aluguel, Condomínio)</option>
+            <option value="Serviços">💡 Serviços (Luz, Água, Gás, Net)</option>
+            <option value="Alimentação">🛒 Alimentação (Supermercado, Feira)</option>
+            <option value="Cartão">💳 Cartão de Crédito</option>
+            <option value="Transporte">🚗 Transporte (Combustível, App)</option>
+            <option value="Saúde">💊 Saúde & Farmácia</option>
+            <option value="Lazer">🍿 Lazer & Streaming</option>
+            <option value="Outros">📦 Outros</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">
+            Link de Pagamento <span class="text-slate-500 font-normal">(Opcional: boleto, app do banco ou pix)</span>
+          </label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
+            </span>
+            <input 
+              type="text" 
+              id="editExpensePaymentUrl" 
+              placeholder="Ex: nubank.com.br/pagar, link do boleto ou código" 
+              class="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+            >
+          </div>
+        </div>
+
+        <div class="pt-1">
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" id="editExpensePaid" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700">
+            <span class="text-xs font-medium text-slate-300">Esta conta já foi paga</span>
+          </label>
+        </div>
+
+        <div class="flex gap-3 pt-3 border-t border-slate-800">
+          <button 
+            type="button" 
+            id="cancelEditModalBtn" 
+            class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button 
+            type="submit" 
+            class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 transition-smooth"
+          >
+            Salvar Alterações
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIRMAÇÃO DE EXCLUSÃO -->
+  <div id="deleteModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="glass-panel max-w-sm w-full p-6 rounded-2xl border border-slate-800 shadow-2xl text-center space-y-4">
+      <div class="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 mx-auto flex items-center justify-center">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+        </svg>
+      </div>
+      <div>
+        <h4 class="text-base font-bold text-white" id="modalTitle">Excluir Item?</h4>
+        <p class="text-xs text-slate-400 mt-1" id="modalDescription">Tem certeza que deseja excluir este registro?</p>
+      </div>
+      <div class="flex gap-3">
+        <button id="modalCancelBtn" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors">Cancelar</button>
+        <button id="modalConfirmBtn" class="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white transition-colors">Sim, Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+

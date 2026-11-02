@@ -1,0 +1,22 @@
+{
+  "name": "gestao-de-casa",
+  "version": "1.0.0",
+  "description": "Sistema Full Stack de Gestão de Contas e Finanças Domésticas",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "financas",
+    "gestao-de-casa",
+    "orcamento",
+    "contas"
+  ],
+  "author": "Junior",
+  "license": "MIT",
+  "dependencies": {
+    "firebase": "^13.1.0"
+  }
+}

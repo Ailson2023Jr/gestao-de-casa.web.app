@@ -1,0 +1,147 @@
+{
+  "incomes": [
+    {
+      "id": "inc-1793565669274",
+      "description": "Sobra das receitas anteriores",
+      "amount": 2237,
+      "category": "Outros",
+      "date": "2026-11-01"
+    },
+    {
+      "id": "inc-1793493171693",
+      "description": "Salário Bia",
+      "amount": 5670,
+      "category": "Salário",
+      "date": "2026-11-02"
+    },
+    {
+      "id": "inc-1793480446430",
+      "description": "Vale Junior",
+      "amount": 2191,
+      "category": "Salário",
+      "date": "2026-10-15"
+    },
+    {
+      "id": "inc-1793479073783",
+      "description": "Salário Junior",
+      "amount": 2717.88,
+      "category": "Salário",
+      "date": "2026-10-30"
+    }
+  ],
+  "expenses": [
+    {
+      "id": "exp-1793495122552",
+      "description": "Luz",
+      "amount": 219.48,
+      "dueDate": "2026-11-01",
+      "category": "Serviços",
+      "paid": false
+    },
+    {
+      "id": "exp-1793495054995",
+      "description": "HR-V",
+      "amount": 572,
+      "dueDate": "2026-11-15",
+      "category": "Transporte",
+      "paid": false
+    },
+    {
+      "id": "exp-1793495031428",
+      "description": "Claro Junior",
+      "amount": 42.89,
+      "dueDate": "2026-11-15",
+      "category": "Moradia",
+      "paid": false
+    },
+    {
+      "id": "exp-1793495010870",
+      "description": "Cartão Mercado Pago",
+      "amount": 787.87,
+      "dueDate": "2026-11-15",
+      "category": "Cartão",
+      "paid": false
+    },
+    {
+      "id": "exp-1793494909597",
+      "description": "Condominio",
+      "amount": 643,
+      "dueDate": "2026-11-15",
+      "category": "Moradia",
+      "paid": false
+    },
+    {
+      "id": "exp-1793494874754",
+      "description": "NUBANK JR",
+      "amount": 2378.73,
+      "dueDate": "2026-11-15",
+      "category": "Cartão",
+      "paid": false
+    },
+    {
+      "id": "exp-1793494176824",
+      "description": "STL",
+      "amount": 20,
+      "dueDate": "2026-11-05",
+      "category": "Outros",
+      "paid": false
+    },
+    {
+      "id": "exp-1793494140079",
+      "description": "YOU TUBE",
+      "amount": 9,
+      "dueDate": "2026-11-05",
+      "category": "Lazer",
+      "paid": false
+    },
+    {
+      "id": "exp-1793494096999",
+      "description": "Lavagem carro",
+      "amount": 80,
+      "dueDate": "2026-10-31",
+      "category": "Transporte",
+      "paymentUrl": "https://nubank.com.br",
+      "paid": false
+    },
+    {
+      "id": "exp-1793494076341",
+      "description": "PSICOLOGA BIA",
+      "amount": 200,
+      "dueDate": "2026-11-05",
+      "category": "Saúde",
+      "paid": false
+    },
+    {
+      "id": "exp-1793494041803",
+      "description": "VAN OLÍVIA",
+      "amount": 170,
+      "dueDate": "2026-11-05",
+      "category": "Transporte",
+      "paid": false
+    },
+    {
+      "id": "exp-1793493984694",
+      "description": "Cartão Bia",
+      "amount": 6609.48,
+      "dueDate": "2026-11-02",
+      "category": "Cartão",
+      "paid": false
+    },
+    {
+      "id": "exp-1793493928296",
+      "description": "PÓS BIA",
+      "amount": 80,
+      "dueDate": "2026-11-05",
+      "category": "Outros",
+      "paid": false
+    },
+    {
+      "id": "exp-1793479004271",
+      "description": "Internet",
+      "amount": 99,
+      "dueDate": "2026-11-01",
+      "category": "Serviços",
+      "paid": true
+    }
+  ]
+}

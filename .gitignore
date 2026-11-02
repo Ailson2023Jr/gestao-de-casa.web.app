@@ -1,0 +1,16 @@
+# Dependências
+node_modules/
+
+# Firebase cache e logs
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+
+# Variáveis de ambiente
+.env
+.env.local
+
+# Arquivos de sistema
+Thumbs.db
+Desktop.ini
+.DS_Store
