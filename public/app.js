@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   let firestoreDb = null;
+  let firebaseAuth = null;
   let useFirestore = false;
 
   try {
@@ -21,6 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       firestoreDb = firebase.firestore();
       useFirestore = true;
+      if (firebase.auth) {
+        firebaseAuth = firebase.auth();
+        console.log('🔐 Firebase Authentication pronto!');
+      }
       console.log('☁️ Firebase Firestore conectado com sucesso!');
     }
   } catch (err) {
@@ -30,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Estado da Aplicação
   let state = {
     isOnline: false,
+    currentUser: null,
     currentFilter: 'all',
     incomes: [],
     expenses: [],
@@ -128,6 +134,39 @@ document.addEventListener('DOMContentLoaded', () => {
     modalDescription: document.getElementById('modalDescription'),
     modalCancelBtn: document.getElementById('modalCancelBtn'),
     modalConfirmBtn: document.getElementById('modalConfirmBtn'),
+
+    // Perfil do Usuário Autenticado & Header
+    userProfileBadge: document.getElementById('userProfileBadge'),
+    userAvatar: document.getElementById('userAvatar'),
+    userAvatarText: document.getElementById('userAvatarText'),
+    userNameDisplay: document.getElementById('userNameDisplay'),
+    userEmailDisplay: document.getElementById('userEmailDisplay'),
+    changePasswordBtn: document.getElementById('changePasswordBtn'),
+    logoutBtn: document.getElementById('logoutBtn'),
+    openLoginBtn: document.getElementById('openLoginBtn'),
+
+    // Modal de Login
+    authModal: document.getElementById('authModal'),
+    authForm: document.getElementById('authForm'),
+    authEmail: document.getElementById('authEmail'),
+    authPassword: document.getElementById('authPassword'),
+    authSubmitBtn: document.getElementById('authSubmitBtn'),
+    authErrorAlert: document.getElementById('authErrorAlert'),
+    authErrorText: document.getElementById('authErrorText'),
+    forgotPasswordLink: document.getElementById('forgotPasswordLink'),
+    togglePasswordBtn: document.getElementById('togglePasswordBtn'),
+    quickProfileJunior: document.getElementById('quickProfileJunior'),
+    quickProfileBia: document.getElementById('quickProfileBia'),
+
+    // Modal de Alteração de Senha
+    changePasswordModal: document.getElementById('changePasswordModal'),
+    changePasswordForm: document.getElementById('changePasswordForm'),
+    newPassword: document.getElementById('newPassword'),
+    confirmNewPassword: document.getElementById('confirmNewPassword'),
+    closeChangePasswordBtn: document.getElementById('closeChangePasswordBtn'),
+    cancelChangePasswordBtn: document.getElementById('cancelChangePasswordBtn'),
+    sendResetEmailSelfBtn: document.getElementById('sendResetEmailSelfBtn'),
+    changePasswordEmailNote: document.getElementById('changePasswordEmailNote'),
 
     toastContainer: document.getElementById('toastContainer')
   };
@@ -1658,6 +1697,327 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.tabMonthlyBtn.addEventListener('click', () => switchChartTab('monthly'));
   }
 
+  // ==========================================
+  // AUTENTICAÇÃO E GERENCIAMENTO DE USUÁRIOS
+  // ==========================================
+  const showAuthError = (msg) => {
+    if (elements.authErrorAlert && elements.authErrorText) {
+      elements.authErrorText.textContent = msg;
+      elements.authErrorAlert.classList.remove('hidden');
+    }
+  };
+
+  const hideAuthError = () => {
+    if (elements.authErrorAlert) {
+      elements.authErrorAlert.classList.add('hidden');
+    }
+  };
+
+  const updateAuthUI = (user) => {
+    state.currentUser = user;
+
+    if (user) {
+      // Usuário Autenticado
+      if (elements.authModal) {
+        elements.authModal.classList.add('hidden');
+      }
+      if (elements.openLoginBtn) {
+        elements.openLoginBtn.classList.add('hidden');
+        elements.openLoginBtn.classList.remove('flex');
+      }
+      if (elements.userProfileBadge) {
+        elements.userProfileBadge.classList.remove('hidden');
+        elements.userProfileBadge.classList.add('flex');
+      }
+
+      const email = user.email || '';
+      let displayName = user.displayName || '';
+      let initial = 'U';
+      let avatarGradient = 'from-indigo-500 to-purple-600';
+
+      if (email.toLowerCase().includes('ailson') || email.toLowerCase().includes('junior')) {
+        displayName = 'Junior';
+        initial = 'J';
+        avatarGradient = 'from-indigo-500 to-purple-600';
+      } else if (email.toLowerCase().includes('bia') || email.toLowerCase().includes('mazzucco')) {
+        displayName = 'Bia';
+        initial = 'B';
+        avatarGradient = 'from-pink-500 to-rose-600';
+      } else {
+        displayName = displayName || email.split('@')[0];
+        initial = displayName.charAt(0).toUpperCase();
+      }
+
+      if (elements.userNameDisplay) elements.userNameDisplay.textContent = displayName;
+      if (elements.userEmailDisplay) elements.userEmailDisplay.textContent = email;
+      if (elements.userAvatarText) elements.userAvatarText.textContent = initial;
+      if (elements.userAvatar) {
+        elements.userAvatar.className = `w-7 h-7 rounded-xl bg-gradient-to-tr ${avatarGradient} flex items-center justify-center font-bold text-white text-xs shadow-inner`;
+      }
+      if (elements.changePasswordEmailNote) {
+        elements.changePasswordEmailNote.textContent = `Conta ativa: ${email}`;
+      }
+    } else {
+      // Usuário Deslogado
+      if (elements.userProfileBadge) {
+        elements.userProfileBadge.classList.add('hidden');
+        elements.userProfileBadge.classList.remove('flex');
+      }
+      if (elements.openLoginBtn) {
+        elements.openLoginBtn.classList.remove('hidden');
+        elements.openLoginBtn.classList.add('flex');
+      }
+      if (elements.authModal) {
+        elements.authModal.classList.remove('hidden');
+      }
+    }
+  };
+
+  const setupAuth = () => {
+    if (firebaseAuth) {
+      firebaseAuth.onAuthStateChanged((user) => {
+        if (user) {
+          console.log('👤 Usuário autenticado:', user.email);
+          updateAuthUI(user);
+        } else {
+          console.log('🔒 Nenhum usuário logado.');
+          updateAuthUI(null);
+        }
+      });
+    } else {
+      const savedUser = localStorage.getItem('gestao_de_casa_user');
+      if (savedUser) {
+        try {
+          updateAuthUI(JSON.parse(savedUser));
+        } catch (e) {
+          updateAuthUI(null);
+        }
+      } else {
+        updateAuthUI(null);
+      }
+    }
+  };
+
+  // Seletor Rápido de Perfil (Junior & Bia)
+  if (elements.quickProfileJunior) {
+    elements.quickProfileJunior.addEventListener('click', () => {
+      elements.authEmail.value = 'ailsonferreirajr@gmail.com';
+      elements.quickProfileJunior.classList.add('border-indigo-500', 'bg-slate-800');
+      if (elements.quickProfileBia) {
+        elements.quickProfileBia.classList.remove('border-rose-500', 'bg-slate-800');
+      }
+      hideAuthError();
+      elements.authPassword.focus();
+    });
+  }
+
+  if (elements.quickProfileBia) {
+    elements.quickProfileBia.addEventListener('click', () => {
+      elements.authEmail.value = 'biamazzucco@gmail.com';
+      elements.quickProfileBia.classList.add('border-rose-500', 'bg-slate-800');
+      if (elements.quickProfileJunior) {
+        elements.quickProfileJunior.classList.remove('border-indigo-500', 'bg-slate-800');
+      }
+      hideAuthError();
+      elements.authPassword.focus();
+    });
+  }
+
+  // Alternar Visibilidade da Senha
+  if (elements.togglePasswordBtn && elements.authPassword) {
+    elements.togglePasswordBtn.addEventListener('click', () => {
+      const isPassword = elements.authPassword.type === 'password';
+      elements.authPassword.type = isPassword ? 'text' : 'password';
+    });
+  }
+
+  // Envio do Formulário de Login
+  if (elements.authForm) {
+    elements.authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = elements.authEmail.value.trim();
+      const password = elements.authPassword.value;
+
+      if (!email || !password) {
+        showAuthError('Informe o e-mail e a senha.');
+        return;
+      }
+
+      hideAuthError();
+      elements.authSubmitBtn.disabled = true;
+      const originalBtnHtml = elements.authSubmitBtn.innerHTML;
+      elements.authSubmitBtn.innerHTML = `
+        <span class="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-1.5"></span>
+        Entrando...
+      `;
+
+      try {
+        if (firebaseAuth) {
+          await firebaseAuth.signInWithEmailAndPassword(email, password);
+          showToast(`Bem-vindo(a) de volta!`, 'success');
+        } else {
+          // Fallback offline
+          const mockUser = {
+            email,
+            displayName: email.toLowerCase().includes('junior') ? 'Junior' : email.toLowerCase().includes('bia') ? 'Bia' : email.split('@')[0]
+          };
+          localStorage.setItem('gestao_de_casa_user', JSON.stringify(mockUser));
+          updateAuthUI(mockUser);
+          showToast(`Login efetuado (modo local).`, 'success');
+        }
+      } catch (err) {
+        console.error('Erro de autenticação:', err);
+        let msg = 'Erro ao realizar login. Verifique seus dados.';
+        if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+          msg = 'Senha incorreta. Verifique se digitou maiúsculas e símbolos corretamente.';
+        } else if (err.code === 'auth/user-not-found') {
+          msg = 'Nenhum usuário cadastrado com este e-mail.';
+        } else if (err.code === 'auth/too-many-requests') {
+          msg = 'Muitas tentativas sem sucesso. Aguarde alguns instantes.';
+        } else if (err.code === 'auth/invalid-email') {
+          msg = 'Formato de e-mail inválido.';
+        }
+        showAuthError(msg);
+      } finally {
+        elements.authSubmitBtn.disabled = false;
+        elements.authSubmitBtn.innerHTML = originalBtnHtml;
+      }
+    });
+  }
+
+  // Link "Esqueci a Senha"
+  if (elements.forgotPasswordLink) {
+    elements.forgotPasswordLink.addEventListener('click', async () => {
+      const email = elements.authEmail.value.trim();
+      if (!email) {
+        showAuthError('Selecione um perfil ou digite seu e-mail no campo acima.');
+        elements.authEmail.focus();
+        return;
+      }
+
+      try {
+        if (firebaseAuth) {
+          await firebaseAuth.sendPasswordResetEmail(email);
+          showToast(`E-mail de redefinição enviado para ${email}! Verifique sua caixa de entrada e spam.`, 'info');
+        } else {
+          showToast(`Simulação: link enviado para ${email}.`, 'info');
+        }
+      } catch (err) {
+        showAuthError('Falha ao enviar e-mail: ' + err.message);
+      }
+    });
+  }
+
+  // Logout / Sair
+  if (elements.logoutBtn) {
+    elements.logoutBtn.addEventListener('click', async () => {
+      if (confirm('Deseja realmente sair da sua conta?')) {
+        if (firebaseAuth) {
+          await firebaseAuth.signOut();
+        } else {
+          localStorage.removeItem('gestao_de_casa_user');
+          updateAuthUI(null);
+        }
+        showToast('Você saiu da sua conta.', 'info');
+      }
+    });
+  }
+
+  // Abrir Modal de Login Manualmente se Necessário
+  if (elements.openLoginBtn) {
+    elements.openLoginBtn.addEventListener('click', () => {
+      if (elements.authModal) {
+        elements.authModal.classList.remove('hidden');
+      }
+    });
+  }
+
+  // Modal de Alteração de Senha
+  const openChangePasswordModal = () => {
+    if (elements.changePasswordModal) {
+      elements.newPassword.value = '';
+      elements.confirmNewPassword.value = '';
+      elements.changePasswordModal.classList.remove('hidden');
+      elements.changePasswordModal.classList.add('flex');
+    }
+  };
+
+  const closeChangePasswordModal = () => {
+    if (elements.changePasswordModal) {
+      elements.changePasswordModal.classList.add('hidden');
+      elements.changePasswordModal.classList.remove('flex');
+    }
+  };
+
+  if (elements.changePasswordBtn) {
+    elements.changePasswordBtn.addEventListener('click', openChangePasswordModal);
+  }
+  if (elements.closeChangePasswordBtn) {
+    elements.closeChangePasswordBtn.addEventListener('click', closeChangePasswordModal);
+  }
+  if (elements.cancelChangePasswordBtn) {
+    elements.cancelChangePasswordBtn.addEventListener('click', closeChangePasswordModal);
+  }
+  if (elements.changePasswordModal) {
+    elements.changePasswordModal.addEventListener('click', (e) => {
+      if (e.target === elements.changePasswordModal) {
+        closeChangePasswordModal();
+      }
+    });
+  }
+
+  if (elements.changePasswordForm) {
+    elements.changePasswordForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const newPass = elements.newPassword.value;
+      const confirmPass = elements.confirmNewPassword.value;
+
+      if (newPass.length < 6) {
+        showToast('A nova senha deve ter no mínimo 6 caracteres.', 'error');
+        return;
+      }
+
+      if (newPass !== confirmPass) {
+        showToast('As duas senhas digitadas não coincidem.', 'error');
+        return;
+      }
+
+      try {
+        if (firebaseAuth && firebaseAuth.currentUser) {
+          await firebaseAuth.currentUser.updatePassword(newPass);
+          showToast('Sua senha foi alterada com sucesso! Guarde-a com segurança.', 'success');
+          closeChangePasswordModal();
+        } else {
+          showToast('Senha alterada localmente com sucesso!', 'success');
+          closeChangePasswordModal();
+        }
+      } catch (err) {
+        console.error('Erro ao atualizar senha:', err);
+        if (err.code === 'auth/requires-recent-login') {
+          showToast('Por segurança, saia e faça login novamente antes de alterar a senha.', 'error');
+        } else {
+          showToast('Erro ao atualizar senha: ' + err.message, 'error');
+        }
+      }
+    });
+  }
+
+  if (elements.sendResetEmailSelfBtn) {
+    elements.sendResetEmailSelfBtn.addEventListener('click', async () => {
+      const email = state.currentUser ? state.currentUser.email : '';
+      if (!email) return;
+      try {
+        if (firebaseAuth) {
+          await firebaseAuth.sendPasswordResetEmail(email);
+          showToast(`Link de redefinição enviado para ${email}!`, 'info');
+          closeChangePasswordModal();
+        }
+      } catch (err) {
+        showToast('Erro ao enviar e-mail: ' + err.message, 'error');
+      }
+    });
+  }
+
   // Fechar modal ao clicar fora ou ao pressionar ESC
   elements.chartModal.addEventListener('click', (e) => {
     if (e.target === elements.chartModal) {
@@ -1676,11 +2036,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (elements.editExpenseModal && !elements.editExpenseModal.classList.contains('hidden')) {
         closeEditExpenseModal();
       }
+      if (elements.changePasswordModal && !elements.changePasswordModal.classList.contains('hidden')) {
+        closeChangePasswordModal();
+      }
     }
   });
 
   // Inicialização
   setupDates();
+  setupAuth();
   loadData();
 });
 
