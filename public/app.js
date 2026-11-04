@@ -39,6 +39,35 @@ document.addEventListener('DOMContentLoaded', () => {
     currentFilter: 'all',
     incomes: [],
     expenses: [],
+    budgets: {
+      "Moradia": 2200,
+      "Alimentação": 1500,
+      "Serviços": 500,
+      "Transporte": 400,
+      "Cartão": 1000,
+      "Saúde": 300,
+      "Lazer": 300,
+      "Investimentos / Reserva": 1000,
+      "Outros": 300
+    },
+    savingsGoal: {
+      monthlyTarget: 1000,
+      initialReserve: 2500,
+      priorityMode: true
+    },
+    filters: {
+      status: 'all',
+      category: 'all',
+      minAmount: null,
+      maxAmount: null,
+      sortBy: 'dueDateAsc'
+    },
+    dueAlerts: {
+      lateCount: 0,
+      lateAmount: 0,
+      todayCount: 0,
+      todayAmount: 0
+    },
     pendingDelete: null, // { type: 'income' | 'expense', id: string, name: string }
     chartInstance: null,
     monthlyChartInstance: null,
@@ -84,6 +113,9 @@ document.addEventListener('DOMContentLoaded', () => {
     cardPendingAmount: document.getElementById('cardPendingAmount'),
     countIncomes: document.getElementById('countIncomes'),
     countExpenses: document.getElementById('countExpenses'),
+    momIncomeBadge: document.getElementById('momIncomeBadge'),
+    momExpenseBadge: document.getElementById('momExpenseBadge'),
+    freeSpendableBadge: document.getElementById('freeSpendableBadge'),
 
     // Barra de Porcentagem & Diagnóstico
     percentageDisplay: document.getElementById('percentageDisplay'),
@@ -94,12 +126,37 @@ document.addEventListener('DOMContentLoaded', () => {
     analysisIcon: document.getElementById('analysisIcon'),
     percentageContainer: document.getElementById('percentageContainer'),
 
+    // Seção Pague-se Primeiro (Metas de Economia)
+    openSavingsGoalModalBtn: document.getElementById('openSavingsGoalModalBtn'),
+    savingsGoalModal: document.getElementById('savingsGoalModal'),
+    closeSavingsModalBtn: document.getElementById('closeSavingsModalBtn'),
+    cancelSavingsModalBtn: document.getElementById('cancelSavingsModalBtn'),
+    savingsGoalForm: document.getElementById('savingsGoalForm'),
+    savingsMonthlyTargetInput: document.getElementById('savingsMonthlyTargetInput'),
+    savingsPriorityModeToggle: document.getElementById('savingsPriorityModeToggle'),
+    savingsTargetDisplay: document.getElementById('savingsTargetDisplay'),
+    savingsSavedDisplay: document.getElementById('savingsSavedDisplay'),
+    savingsProgressPercent: document.getElementById('savingsProgressPercent'),
+    savingsProgressBar: document.getElementById('savingsProgressBar'),
+    savingsStatusLabel: document.getElementById('savingsStatusLabel'),
+    effectiveFreeSpendable: document.getElementById('effectiveFreeSpendable'),
+
+    // Seção Orçamentos por Categoria (Budgets)
+    openBudgetModalBtn: document.getElementById('openBudgetModalBtn'),
+    budgetModal: document.getElementById('budgetModal'),
+    closeBudgetModalBtn: document.getElementById('closeBudgetModalBtn'),
+    cancelBudgetModalBtn: document.getElementById('cancelBudgetModalBtn'),
+    budgetForm: document.getElementById('budgetForm'),
+    budgetInputsContainer: document.getElementById('budgetInputsContainer'),
+    budgetBarsContainer: document.getElementById('budgetBarsContainer'),
+
     // Formulários
     incomeForm: document.getElementById('incomeForm'),
     incomeDescription: document.getElementById('incomeDescription'),
     incomeAmount: document.getElementById('incomeAmount'),
     incomeCategory: document.getElementById('incomeCategory'),
     incomeDate: document.getElementById('incomeDate'),
+    incomeRecurring: document.getElementById('incomeRecurring'),
     incomeList: document.getElementById('incomeList'),
     incomeCountBadge: document.getElementById('incomeCountBadge'),
 
@@ -110,7 +167,22 @@ document.addEventListener('DOMContentLoaded', () => {
     expenseCategory: document.getElementById('expenseCategory'),
     expensePaymentUrl: document.getElementById('expensePaymentUrl'),
     expensePaid: document.getElementById('expensePaid'),
+    expenseRecurring: document.getElementById('expenseRecurring'),
     expenseList: document.getElementById('expenseList'),
+
+    // Alertas de Vencimento
+    dueAlertsBanner: document.getElementById('dueAlertsBanner'),
+    dueAlertsText: document.getElementById('dueAlertsText'),
+    focusUrgentExpensesBtn: document.getElementById('focusUrgentExpensesBtn'),
+
+    // Filtros e Ordenação Avançados
+    filterButtons: document.querySelectorAll('.filter-btn'),
+    filterCategory: document.getElementById('filterCategory'),
+    filterMinAmount: document.getElementById('filterMinAmount'),
+    filterMaxAmount: document.getElementById('filterMaxAmount'),
+    filterSortBy: document.getElementById('filterSortBy'),
+    clearFiltersBtn: document.getElementById('clearFiltersBtn'),
+    cloneRecurringBtn: document.getElementById('cloneRecurringBtn'),
 
     // Modal de Edição de Conta
     editExpenseModal: document.getElementById('editExpenseModal'),
@@ -122,11 +194,9 @@ document.addEventListener('DOMContentLoaded', () => {
     editExpenseCategory: document.getElementById('editExpenseCategory'),
     editExpensePaymentUrl: document.getElementById('editExpensePaymentUrl'),
     editExpensePaid: document.getElementById('editExpensePaid'),
+    editExpenseRecurring: document.getElementById('editExpenseRecurring'),
     closeEditModalBtn: document.getElementById('closeEditModalBtn'),
     cancelEditModalBtn: document.getElementById('cancelEditModalBtn'),
-
-    // Filtros
-    filterButtons: document.querySelectorAll('.filter-btn'),
 
     // Modal
     deleteModal: document.getElementById('deleteModal'),
@@ -241,22 +311,43 @@ document.addEventListener('DOMContentLoaded', () => {
   const getLocalData = () => {
     const defaultData = {
       incomes: [
-        { id: 'inc-1', description: 'Salário Mensal', amount: 5500, category: 'Salário', date: '2026-10-05' },
-        { id: 'inc-2', description: 'Renda Extra / Freelance', amount: 1200, category: 'Extra', date: '2026-10-18' }
+        { id: 'inc-1', description: 'Salário Junior', amount: 2717.88, category: 'Salário', date: '2026-11-01', recurring: true },
+        { id: 'inc-2', description: 'Salário Bia', amount: 5670.00, category: 'Salário', date: '2026-11-02', recurring: true },
+        { id: 'inc-3', description: 'Vale Junior', amount: 2191.00, category: 'Salário', date: '2026-11-15', recurring: true },
+        { id: 'inc-4', description: 'Sobra das receitas anteriores', amount: 2237.00, category: 'Salário', date: '2026-11-01', recurring: false }
       ],
       expenses: [
-        { id: 'exp-1', description: 'Aluguel & Condomínio', amount: 1800, dueDate: '2026-11-10', category: 'Moradia', paid: true },
-        { id: 'exp-2', description: 'Energia Elétrica (Enel)', amount: 230.50, dueDate: '2026-11-15', category: 'Serviços', paid: false },
-        { id: 'exp-3', description: 'Internet Fibra 500MB', amount: 119.90, dueDate: '2026-11-12', category: 'Serviços', paid: true },
-        { id: 'exp-4', description: 'Supermercado Mensal', amount: 1150, dueDate: '2026-11-08', category: 'Alimentação', paid: false },
-        { id: 'exp-5', description: 'Fatura do Cartão', amount: 840, dueDate: '2026-11-20', category: 'Cartão', paid: false }
-      ]
+        { id: 'exp-1', description: 'Cartão Bia', amount: 6609.48, dueDate: '2026-11-01', category: 'Cartão', paid: false, recurring: true },
+        { id: 'exp-2', description: 'Lavagem carro', amount: 80.00, dueDate: '2026-11-01', category: 'Transporte', paid: false, paymentUrl: 'https://nubank.com.br', recurring: false },
+        { id: 'exp-3', description: 'Internet', amount: 99.00, dueDate: '2026-11-01', category: 'Serviços', paid: true, recurring: true },
+        { id: 'exp-4', description: 'STL', amount: 20.00, dueDate: '2026-11-05', category: 'Moradia', paid: false, recurring: false },
+        { id: 'exp-5', description: 'PSICOLOGA BIA', amount: 200.00, dueDate: '2026-11-05', category: 'Saúde', paid: false, recurring: true }
+      ],
+      budgets: {
+        "Moradia": 2200,
+        "Alimentação": 1500,
+        "Serviços": 500,
+        "Transporte": 400,
+        "Cartão": 7000,
+        "Saúde": 600,
+        "Lazer": 300,
+        "Investimentos / Reserva": 1000,
+        "Outros": 300
+      },
+      savingsGoal: {
+        monthlyTarget: 1000,
+        initialReserve: 2500,
+        priorityMode: true
+      }
     };
 
     try {
       const stored = localStorage.getItem('gestao_de_casa_data');
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (parsed.budgets) state.budgets = { ...state.budgets, ...parsed.budgets };
+        if (parsed.savingsGoal) state.savingsGoal = { ...state.savingsGoal, ...parsed.savingsGoal };
+        return parsed;
       }
       localStorage.setItem('gestao_de_casa_data', JSON.stringify(defaultData));
       return defaultData;
@@ -269,7 +360,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       localStorage.setItem('gestao_de_casa_data', JSON.stringify({
         incomes: state.incomes,
-        expenses: state.expenses
+        expenses: state.expenses,
+        budgets: state.budgets,
+        savingsGoal: state.savingsGoal
       }));
     } catch (e) {
       console.error('Falha ao salvar localmente:', e);
@@ -292,7 +385,6 @@ document.addEventListener('DOMContentLoaded', () => {
         (snapshot) => {
           if (!firstIncomeCheck) {
             firstIncomeCheck = true;
-            // Se o Firestore estiver vazio na primeira vez, migra dados locais para a nuvem
             if (snapshot.empty) {
               const local = getLocalData();
               if (local.incomes && local.incomes.length > 0) {
@@ -346,6 +438,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       );
 
+      // Escuta em tempo real dos orçamentos (budgets)
+      firestoreDb.collection('budgets').doc('categories').onSnapshot(
+        (doc) => {
+          if (doc.exists) {
+            state.budgets = { ...state.budgets, ...doc.data() };
+            renderAll();
+          } else {
+            // Inicializa doc no Firestore se ainda não existir
+            firestoreDb.collection('budgets').doc('categories').set(state.budgets).catch(() => {});
+          }
+        },
+        (err) => console.log('Escuta de orçamentos local:', err.message)
+      );
+
+      // Escuta em tempo real das configurações de meta (savingsGoal)
+      firestoreDb.collection('settings').doc('savingsGoal').onSnapshot(
+        (doc) => {
+          if (doc.exists) {
+            state.savingsGoal = { ...state.savingsGoal, ...doc.data() };
+            renderAll();
+          } else {
+            firestoreDb.collection('settings').doc('savingsGoal').set(state.savingsGoal).catch(() => {});
+          }
+        },
+        (err) => console.log('Escuta de meta local:', err.message)
+      );
+
       return;
     }
 
@@ -361,6 +480,8 @@ document.addEventListener('DOMContentLoaded', () => {
           state.isOnline = true;
           state.incomes = json.data.incomes || [];
           state.expenses = json.data.expenses || [];
+          if (json.data.budgets) state.budgets = { ...state.budgets, ...json.data.budgets };
+          if (json.data.savingsGoal) state.savingsGoal = { ...state.savingsGoal, ...json.data.savingsGoal };
           elements.connectionText.textContent = 'Servidor Local';
           elements.connectionBadge.className = 'hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium';
           renderAll();
@@ -376,14 +497,373 @@ document.addEventListener('DOMContentLoaded', () => {
     const local = getLocalData();
     state.incomes = local.incomes;
     state.expenses = local.expenses;
+    if (local.budgets) state.budgets = { ...state.budgets, ...local.budgets };
+    if (local.savingsGoal) state.savingsGoal = { ...state.savingsGoal, ...local.savingsGoal };
     elements.connectionText.textContent = 'Modo Local (Offline)';
     elements.connectionBadge.className = 'hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-medium';
     renderAll();
   };
 
+  // ==========================================
+  // CÁLCULO MoM (Month over Month)
+  // ==========================================
+  const computeMoM = () => {
+    const incomesByMonth = {};
+    const expensesByMonth = {};
+
+    state.incomes.forEach(inc => {
+      const m = (inc.date || '').slice(0, 7);
+      if (m && m.length === 7) {
+        incomesByMonth[m] = (incomesByMonth[m] || 0) + (Number(inc.amount) || 0);
+      }
+    });
+
+    state.expenses.forEach(exp => {
+      const m = (exp.dueDate || '').slice(0, 7);
+      if (m && m.length === 7) {
+        expensesByMonth[m] = (expensesByMonth[m] || 0) + (Number(exp.amount) || 0);
+      }
+    });
+
+    const allMonths = Array.from(new Set([...Object.keys(incomesByMonth), ...Object.keys(expensesByMonth)])).sort();
+    if (allMonths.length < 2) {
+      return { hasMoM: false };
+    }
+
+    const currentKey = allMonths[allMonths.length - 1];
+    const prevKey = allMonths[allMonths.length - 2];
+
+    const currentInc = incomesByMonth[currentKey] || 0;
+    const prevInc = incomesByMonth[prevKey] || 0;
+    const incDiff = currentInc - prevInc;
+    const incPct = prevInc > 0 ? (incDiff / prevInc) * 100 : 0;
+
+    const currentExp = expensesByMonth[currentKey] || 0;
+    const prevExp = expensesByMonth[prevKey] || 0;
+    const expDiff = currentExp - prevExp;
+    const expPct = prevExp > 0 ? (expDiff / prevExp) * 100 : 0;
+
+    return {
+      hasMoM: true,
+      currentKey,
+      prevKey,
+      incDiff,
+      incPct,
+      expDiff,
+      expPct
+    };
+  };
+
+  // ==========================================
+  // METAS DE ECONOMIA (PAGUE-SE PRIMEIRO)
+  // ==========================================
+  const computeSavingsMetrics = (balance) => {
+    const goal = state.savingsGoal || { monthlyTarget: 1000, priorityMode: true };
+    const target = Number(goal.monthlyTarget) || 1000;
+
+    // Despesas alocadas para investimentos / reserva
+    const investmentExpenses = state.expenses
+      .filter(e => e.category === 'Investimentos / Reserva' || e.category === 'Investimentos')
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    // Receitas extras de investimento se houver
+    const investmentIncomes = state.incomes
+      .filter(i => i.category === 'Investimentos / Reserva' || i.category === 'Investimentos')
+      .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+
+    const totalSaved = investmentExpenses + investmentIncomes;
+    const remainingToSave = Math.max(0, target - totalSaved);
+
+    // Pague-se primeiro: se modo prioritário ativado, protege a fatia faltante da meta
+    const effectiveSpendable = goal.priorityMode
+      ? balance - remainingToSave
+      : balance;
+
+    const pct = target > 0 ? (totalSaved / target) * 100 : 100;
+
+    return {
+      target,
+      totalSaved,
+      remainingToSave,
+      effectiveSpendable,
+      pct: Math.min(Math.max(pct, 0), 100),
+      priorityMode: Boolean(goal.priorityMode)
+    };
+  };
+
+  const renderSavingsGoal = (metrics) => {
+    if (!elements.savingsTargetDisplay) return;
+
+    elements.savingsTargetDisplay.textContent = formatMoney(metrics.target);
+    elements.savingsSavedDisplay.textContent = formatMoney(metrics.totalSaved);
+    elements.savingsProgressPercent.textContent = `${metrics.pct.toFixed(0)}%`;
+    elements.savingsProgressBar.style.width = `${metrics.pct}%`;
+
+    if (metrics.totalSaved >= metrics.target) {
+      elements.savingsStatusLabel.textContent = '🎉 Meta mensal atingida!';
+      elements.savingsProgressBar.className = 'h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700';
+    } else {
+      elements.savingsStatusLabel.textContent = `Faltam ${formatMoney(metrics.remainingToSave)} para a meta`;
+      elements.savingsProgressBar.className = 'h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700';
+    }
+
+    if (elements.effectiveFreeSpendable) {
+      elements.effectiveFreeSpendable.textContent = formatMoney(metrics.effectiveSpendable);
+      if (metrics.effectiveSpendable < 0) {
+        elements.effectiveFreeSpendable.className = 'text-sm font-extrabold text-rose-400';
+      } else {
+        elements.effectiveFreeSpendable.className = 'text-sm font-extrabold text-white';
+      }
+    }
+
+    if (elements.freeSpendableBadge) {
+      if (metrics.priorityMode) {
+        elements.freeSpendableBadge.textContent = `Livre: ${formatMoney(metrics.effectiveSpendable)}`;
+        elements.freeSpendableBadge.classList.remove('hidden');
+      } else {
+        elements.freeSpendableBadge.classList.add('hidden');
+      }
+    }
+  };
+
+  // ==========================================
+  // ORÇAMENTOS POR CATEGORIA (BUDGETS)
+  // ==========================================
+  const renderBudgetBars = () => {
+    if (!elements.budgetBarsContainer) return;
+    elements.budgetBarsContainer.innerHTML = '';
+
+    const defaultCategories = [
+      'Moradia', 'Alimentação', 'Serviços', 'Cartão', 'Transporte', 'Saúde', 'Lazer', 'Outros'
+    ];
+
+    // Calcula gasto real em cada categoria
+    const categorySpent = {};
+    state.expenses.forEach(exp => {
+      const cat = exp.category || 'Outros';
+      categorySpent[cat] = (categorySpent[cat] || 0) + (Number(exp.amount) || 0);
+    });
+
+    const catBadgeColors = {
+      'Moradia': 'text-indigo-400 border-indigo-500/20 bg-indigo-500/10',
+      'Serviços': 'text-cyan-400 border-cyan-500/20 bg-cyan-500/10',
+      'Alimentação': 'text-amber-400 border-amber-500/20 bg-amber-500/10',
+      'Cartão': 'text-rose-400 border-rose-500/20 bg-rose-500/10',
+      'Transporte': 'text-purple-400 border-purple-500/20 bg-purple-500/10',
+      'Saúde': 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10',
+      'Lazer': 'text-pink-400 border-pink-500/20 bg-pink-500/10',
+      'Investimentos / Reserva': 'text-purple-300 border-purple-500/20 bg-purple-500/10',
+      'Outros': 'text-slate-400 border-slate-500/20 bg-slate-500/10'
+    };
+
+    defaultCategories.forEach(cat => {
+      const limit = Number(state.budgets[cat]) || 0;
+      const spent = categorySpent[cat] || 0;
+      const pct = limit > 0 ? (spent / limit) * 100 : (spent > 0 ? 100 : 0);
+      const isExceeded = limit > 0 && spent > limit;
+      const isWarning = limit > 0 && pct >= 75 && !isExceeded;
+
+      const barColor = isExceeded
+        ? 'bg-rose-500'
+        : isWarning
+        ? 'bg-amber-400'
+        : 'bg-emerald-500';
+
+      const barWidth = Math.min(Math.max(pct, 0), 100);
+
+      const card = document.createElement('div');
+      card.className = `p-3 rounded-2xl bg-slate-900/80 border transition-all ${
+        isExceeded ? 'border-rose-500/40 bg-rose-950/10' : 'border-slate-800/80'
+      }`;
+
+      card.innerHTML = `
+        <div class="flex items-center justify-between text-xs mb-1.5">
+          <span class="px-2 py-0.5 rounded-md border text-[11px] font-semibold ${catBadgeColors[cat] || catBadgeColors['Outros']}">
+            ${cat}
+          </span>
+          <div class="text-right">
+            <span class="font-bold text-slate-200">${formatMoney(spent)}</span>
+            <span class="text-slate-500 text-[10px]"> / ${formatMoney(limit)}</span>
+          </div>
+        </div>
+
+        <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+          <div class="h-full rounded-full transition-all duration-500 ${barColor}" style="width: ${barWidth}%;"></div>
+        </div>
+
+        <div class="flex items-center justify-between text-[10px] mt-1 text-slate-400">
+          <span>${pct.toFixed(0)}% consumido</span>
+          <span class="${isExceeded ? 'text-rose-400 font-bold' : isWarning ? 'text-amber-400 font-medium' : 'text-slate-500'}">
+            ${isExceeded ? '⚠️ Teto estourado' : isWarning ? 'Atenção ao limite' : `Resta ${formatMoney(Math.max(0, limit - spent))}`}
+          </span>
+        </div>
+      `;
+
+      elements.budgetBarsContainer.appendChild(card);
+    });
+  };
+
+  // Preencher campos do modal de orçamentos
+  const renderBudgetInputs = () => {
+    if (!elements.budgetInputsContainer) return;
+    elements.budgetInputsContainer.innerHTML = '';
+
+    const categories = [
+      'Moradia', 'Alimentação', 'Serviços', 'Cartão', 'Transporte', 'Saúde', 'Lazer', 'Investimentos / Reserva', 'Outros'
+    ];
+
+    categories.forEach(cat => {
+      const val = state.budgets[cat] || 0;
+      const div = document.createElement('div');
+      div.className = 'space-y-1';
+      div.innerHTML = `
+        <label class="block text-xs font-semibold text-slate-300">${cat} (R$)</label>
+        <input 
+          type="number" 
+          step="50" 
+          min="0" 
+          data-budget-cat="${cat}" 
+          value="${val}" 
+          class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-500 transition-colors"
+        >
+      `;
+      elements.budgetInputsContainer.appendChild(div);
+    });
+  };
+
+  // ==========================================
+  // ALERTAS DE VENCIMENTO PROATIVOS
+  // ==========================================
+  const checkDueAlerts = () => {
+    if (!elements.dueAlertsBanner) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const lateExpenses = state.expenses.filter(e => !e.paid && e.dueDate && e.dueDate < todayStr);
+    const todayExpenses = state.expenses.filter(e => !e.paid && e.dueDate && e.dueDate === todayStr);
+
+    const lateCount = lateExpenses.length;
+    const lateAmount = lateExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    const todayCount = todayExpenses.length;
+    const todayAmount = todayExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    state.dueAlerts = { lateCount, lateAmount, todayCount, todayAmount };
+
+    if (lateCount > 0 || todayCount > 0) {
+      elements.dueAlertsBanner.classList.remove('hidden');
+
+      let parts = [];
+      if (lateCount > 0) {
+        parts.push(`<strong class="text-rose-400 font-bold">${lateCount} conta${lateCount > 1 ? 's' : ''} vencida${lateCount > 1 ? 's' : ''}</strong> (${formatMoney(lateAmount)})`);
+      }
+      if (todayCount > 0) {
+        parts.push(`<strong class="text-amber-400 font-bold">${todayCount} vencendo hoje</strong> (${formatMoney(todayAmount)})`);
+      }
+
+      elements.dueAlertsText.innerHTML = `⚠️ <span>Atenção: Você possui ${parts.join(' e ')}.</span>`;
+    } else {
+      elements.dueAlertsBanner.classList.add('hidden');
+    }
+  };
+
+  // ==========================================
+  // CLONAGEM DE TRANSAÇÕES RECORRENTES (MÊS SEGUINTE)
+  // ==========================================
+  const cloneRecurringToNextMonth = async () => {
+    const recurringExpenses = state.expenses.filter(e => e.recurring);
+    const recurringIncomes = state.incomes.filter(i => i.recurring);
+
+    if (recurringExpenses.length === 0 && recurringIncomes.length === 0) {
+      showToast('Nenhuma conta ou receita marcada como "Repetir mensalmente" ainda.', 'info');
+      return;
+    }
+
+    // Calcula o próximo mês a partir de hoje
+    const now = new Date();
+    const nextDateObj = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const nextYear = nextDateObj.getFullYear();
+    const nextMonth = String(nextDateObj.getMonth() + 1).padStart(2, '0');
+    const targetYM = `${nextYear}-${nextMonth}`;
+
+    let createdCount = 0;
+
+    // Helper para gerar a data no próximo mês mantendo o dia original
+    const getNextMonthDate = (origDateStr) => {
+      if (!origDateStr) return `${targetYM}-05`;
+      const parts = origDateStr.split('-');
+      const day = parts[2] || '05';
+      const daysInTargetMonth = new Date(nextYear, Number(nextMonth), 0).getDate();
+      const safeDay = Math.min(Number(day) || 5, daysInTargetMonth);
+      return `${targetYM}-${String(safeDay).padStart(2, '0')}`;
+    };
+
+    // 1. Replicar Despesas
+    for (const exp of recurringExpenses) {
+      const newDueDate = getNextMonthDate(exp.dueDate);
+      const exists = state.expenses.some(e => e.description === exp.description && e.dueDate === newDueDate);
+      if (!exists) {
+        const clonedExp = {
+          description: exp.description,
+          amount: Number(exp.amount) || 0,
+          category: exp.category || 'Moradia',
+          dueDate: newDueDate,
+          paid: false,
+          recurring: true,
+          paymentUrl: exp.paymentUrl || '',
+          createdAt: new Date().toISOString()
+        };
+
+        if (useFirestore && firestoreDb) {
+          await firestoreDb.collection('expenses').add(clonedExp);
+        } else {
+          state.expenses.push({ id: 'exp-' + Date.now() + Math.random().toString(36).substring(2, 6), ...clonedExp });
+        }
+        createdCount++;
+      }
+    }
+
+    // 2. Replicar Receitas
+    for (const inc of recurringIncomes) {
+      const newDate = getNextMonthDate(inc.date);
+      const exists = state.incomes.some(i => i.description === inc.description && i.date === newDate);
+      if (!exists) {
+        const clonedInc = {
+          description: inc.description,
+          amount: Number(inc.amount) || 0,
+          category: inc.category || 'Salário',
+          date: newDate,
+          recurring: true,
+          createdAt: new Date().toISOString()
+        };
+
+        if (useFirestore && firestoreDb) {
+          await firestoreDb.collection('incomes').add(clonedInc);
+        } else {
+          state.incomes.push({ id: 'inc-' + Date.now() + Math.random().toString(36).substring(2, 6), ...clonedInc });
+        }
+        createdCount++;
+      }
+    }
+
+    if (!useFirestore) {
+      saveLocalData();
+      renderAll();
+    }
+
+    if (createdCount > 0) {
+      showToast(`🎉 ${createdCount} lançamentos fixos gerados para o mês ${nextMonth}/${nextYear}!`, 'success');
+    } else {
+      showToast(`As transações recorrentes de ${nextMonth}/${nextYear} já haviam sido geradas!`, 'info');
+    }
+  };
+
   // Renderização Geral
   const renderAll = () => {
     renderSummaryAndBar();
+    renderSavingsGoal(computeSavingsMetrics(state.incomes.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0) - state.expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)));
+    renderBudgetBars();
+    checkDueAlerts();
     renderIncomes();
     renderExpenses();
     if (elements.chartModal && !elements.chartModal.classList.contains('hidden')) {
@@ -414,13 +894,39 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.countIncomes.textContent = state.incomes.length;
     elements.countExpenses.textContent = state.expenses.length;
 
+    // Métricas MoM (Month over Month)
+    const mom = computeMoM();
+    if (mom.hasMoM) {
+      if (elements.momIncomeBadge) {
+        elements.momIncomeBadge.classList.remove('hidden');
+        if (mom.incPct >= 0) {
+          elements.momIncomeBadge.innerHTML = `▲ +${mom.incPct.toFixed(1)}% vs anterior`;
+          elements.momIncomeBadge.className = 'font-semibold text-emerald-400 text-[11px]';
+        } else {
+          elements.momIncomeBadge.innerHTML = `▼ ${mom.incPct.toFixed(1)}% vs anterior`;
+          elements.momIncomeBadge.className = 'font-semibold text-amber-400 text-[11px]';
+        }
+      }
+
+      if (elements.momExpenseBadge) {
+        elements.momExpenseBadge.classList.remove('hidden');
+        if (mom.expPct > 0) {
+          elements.momExpenseBadge.innerHTML = `▲ +${mom.expPct.toFixed(1)}% vs anterior`;
+          elements.momExpenseBadge.className = 'font-semibold text-rose-400 text-[11px]';
+        } else {
+          elements.momExpenseBadge.innerHTML = `▼ ${mom.expPct.toFixed(1)}% vs anterior`;
+          elements.momExpenseBadge.className = 'font-semibold text-emerald-400 text-[11px]';
+        }
+      }
+    }
+
     // Customização do Saldo Líquido
     if (balance < 0) {
       elements.cardBalance.className = 'text-2xl font-extrabold text-rose-500';
-      elements.balanceStatusText.textContent = 'Déficit (Orçamento Negativo)';
+      elements.balanceStatusText.firstElementChild.textContent = 'Déficit (Orçamento Negativo)';
     } else {
       elements.cardBalance.className = 'text-2xl font-extrabold text-blue-400';
-      elements.balanceStatusText.textContent = 'Disponível no mês';
+      elements.balanceStatusText.firstElementChild.textContent = 'Disponível no mês';
     }
 
     // ==========================================
@@ -515,6 +1021,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const item = document.createElement('div');
       item.className = 'p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800/80 flex items-center justify-between gap-3 hover:border-emerald-500/30 transition-smooth group';
 
+      const recurringBadge = income.recurring
+        ? `<span class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-medium" title="Receita mensal recorrente">🔁 Fixa</span>`
+        : '';
+
       item.innerHTML = `
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center flex-shrink-0">
@@ -523,7 +1033,10 @@ document.addEventListener('DOMContentLoaded', () => {
             </svg>
           </div>
           <div class="min-w-0">
-            <p class="text-sm font-semibold text-slate-200 truncate">${income.description}</p>
+            <div class="flex items-center gap-2">
+              <p class="text-sm font-semibold text-slate-200 truncate">${income.description}</p>
+              ${recurringBadge}
+            </div>
             <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
               <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-medium">${income.category || 'Geral'}</span>
               <span>•</span>
@@ -551,22 +1064,52 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  // Renderização da Lista de Contas / Despesas
+  // Renderização da Lista de Contas / Despesas com Filtros e Ordenação Avançados
   const renderExpenses = () => {
     elements.expenseList.innerHTML = '';
 
-    // Filtragem
-    let filtered = state.expenses;
-    if (state.currentFilter === 'pending') {
-      filtered = state.expenses.filter(e => !e.paid);
-    } else if (state.currentFilter === 'paid') {
-      filtered = state.expenses.filter(e => e.paid);
+    // 1. Filtragem por Status
+    let filtered = [...state.expenses];
+    if (state.filters.status === 'pending') {
+      filtered = filtered.filter(e => !e.paid);
+    } else if (state.filters.status === 'paid') {
+      filtered = filtered.filter(e => e.paid);
     }
+
+    // 2. Filtragem por Categoria
+    if (state.filters.category && state.filters.category !== 'all') {
+      filtered = filtered.filter(e => e.category === state.filters.category);
+    }
+
+    // 3. Filtragem por Faixa de Valor
+    if (state.filters.minAmount !== null && !isNaN(state.filters.minAmount)) {
+      filtered = filtered.filter(e => (Number(e.amount) || 0) >= state.filters.minAmount);
+    }
+    if (state.filters.maxAmount !== null && !isNaN(state.filters.maxAmount)) {
+      filtered = filtered.filter(e => (Number(e.amount) || 0) <= state.filters.maxAmount);
+    }
+
+    // 4. Ordenação Avançada
+    filtered.sort((a, b) => {
+      switch (state.filters.sortBy) {
+        case 'dueDateDesc':
+          return (b.dueDate || '').localeCompare(a.dueDate || '');
+        case 'amountDesc':
+          return (Number(b.amount) || 0) - (Number(a.amount) || 0);
+        case 'amountAsc':
+          return (Number(a.amount) || 0) - (Number(b.amount) || 0);
+        case 'descAsc':
+          return (a.description || '').localeCompare(b.description || '');
+        case 'dueDateAsc':
+        default:
+          return (a.dueDate || '').localeCompare(b.dueDate || '');
+      }
+    });
 
     if (filtered.length === 0) {
       elements.expenseList.innerHTML = `
         <div class="py-12 text-center text-slate-500 text-xs">
-          Nenhuma conta encontrada com o filtro "${state.currentFilter}".<br>Adicione novas despesas no formulário acima.
+          Nenhuma conta encontrada para os filtros selecionados.<br>Tente alterar o status, categoria ou faixa de valor.
         </div>
       `;
       return;
@@ -592,6 +1135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'Transporte': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
         'Saúde': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
         'Lazer': 'bg-pink-500/10 text-pink-400 border-pink-500/20',
+        'Investimentos / Reserva': 'bg-purple-500/10 text-purple-300 border-purple-500/20',
         'Outros': 'bg-slate-500/10 text-slate-400 border-slate-500/20'
       };
       const catClass = catColorMap[exp.category] || catColorMap['Outros'];
@@ -610,11 +1154,9 @@ document.addEventListener('DOMContentLoaded', () => {
               class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 hover:border-indigo-400/60 text-indigo-300 hover:text-white transition-all text-xs font-semibold shadow-sm group/paylink"
             >
               <span class="flex items-center gap-1 text-indigo-400 group-hover/paylink:scale-110 transition-transform">
-                <!-- Ícone de celular com pay -->
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                 </svg>
-                <!-- Ícone de link -->
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
                 </svg>
@@ -624,6 +1166,10 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         `;
       }
+
+      const recurringBadge = exp.recurring
+        ? `<span class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-medium" title="Conta mensal recorrente">🔁 Fixa</span>`
+        : '';
 
       item.innerHTML = `
         <!-- Checkbox de Status & Descrição -->
@@ -648,6 +1194,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <p class="text-sm font-semibold truncate ${exp.paid ? 'line-through text-slate-500' : 'text-slate-100'}">
                 ${exp.description}
               </p>
+              ${recurringBadge}
               ${isLate ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold uppercase">Vencida</span>' : ''}
               ${isToday ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold uppercase">Vence Hoje</span>' : ''}
             </div>
@@ -718,6 +1265,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const amount = parseFloat(elements.incomeAmount.value);
     const category = elements.incomeCategory.value;
     const date = elements.incomeDate.value;
+    const recurring = Boolean(elements.incomeRecurring && elements.incomeRecurring.checked);
 
     if (!description || isNaN(amount) || amount <= 0) {
       showToast('Preencha a descrição e um valor positivo válido.', 'error');
@@ -729,6 +1277,7 @@ document.addEventListener('DOMContentLoaded', () => {
       amount,
       category,
       date,
+      recurring,
       createdAt: new Date().toISOString()
     };
 
@@ -784,6 +1333,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const category = elements.expenseCategory.value;
     const paymentUrl = elements.expensePaymentUrl ? elements.expensePaymentUrl.value.trim() : '';
     const paid = elements.expensePaid.checked;
+    const recurring = Boolean(elements.expenseRecurring && elements.expenseRecurring.checked);
 
     if (!description || isNaN(amount) || amount <= 0) {
       showToast('Preencha a descrição e um valor positivo para a conta.', 'error');
@@ -796,6 +1346,7 @@ document.addEventListener('DOMContentLoaded', () => {
       dueDate,
       category,
       paid,
+      recurring,
       createdAt: new Date().toISOString()
     };
     if (paymentUrl) {
@@ -921,7 +1472,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================
-  // FILTROS DE CONTAS
+  // FILTROS DE CONTAS & ORDENAÇÃO AVANÇADA
   // ==========================================
   elements.filterButtons.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -929,10 +1480,240 @@ document.addEventListener('DOMContentLoaded', () => {
         b.className = 'filter-btn px-3 py-1 rounded-lg font-medium transition-colors text-slate-400 hover:text-white';
       });
       btn.className = 'filter-btn px-3 py-1 rounded-lg font-medium transition-colors bg-slate-800 text-white';
-      state.currentFilter = btn.getAttribute('data-filter');
+      state.filters.status = btn.getAttribute('data-filter') || 'all';
       renderExpenses();
     });
   });
+
+  if (elements.filterCategory) {
+    elements.filterCategory.addEventListener('change', (e) => {
+      state.filters.category = e.target.value;
+      renderExpenses();
+    });
+  }
+
+  if (elements.filterMinAmount) {
+    elements.filterMinAmount.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      state.filters.minAmount = isNaN(val) ? null : val;
+      renderExpenses();
+    });
+  }
+
+  if (elements.filterMaxAmount) {
+    elements.filterMaxAmount.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      state.filters.maxAmount = isNaN(val) ? null : val;
+      renderExpenses();
+    });
+  }
+
+  if (elements.filterSortBy) {
+    elements.filterSortBy.addEventListener('change', (e) => {
+      state.filters.sortBy = e.target.value;
+      renderExpenses();
+    });
+  }
+
+  if (elements.clearFiltersBtn) {
+    elements.clearFiltersBtn.addEventListener('click', () => {
+      state.filters = {
+        status: 'all',
+        category: 'all',
+        minAmount: null,
+        maxAmount: null,
+        sortBy: 'dueDateAsc'
+      };
+      if (elements.filterCategory) elements.filterCategory.value = 'all';
+      if (elements.filterMinAmount) elements.filterMinAmount.value = '';
+      if (elements.filterMaxAmount) elements.filterMaxAmount.value = '';
+      if (elements.filterSortBy) elements.filterSortBy.value = 'dueDateAsc';
+      elements.filterButtons.forEach(b => {
+        if (b.getAttribute('data-filter') === 'all') {
+          b.className = 'filter-btn px-3 py-1 rounded-lg font-medium transition-colors bg-slate-800 text-white';
+        } else {
+          b.className = 'filter-btn px-3 py-1 rounded-lg font-medium transition-colors text-slate-400 hover:text-white';
+        }
+      });
+      renderExpenses();
+      showToast('Filtros restaurados para o padrão!', 'info');
+    });
+  }
+
+  if (elements.focusUrgentExpensesBtn) {
+    elements.focusUrgentExpensesBtn.addEventListener('click', () => {
+      state.filters.status = 'pending';
+      state.filters.sortBy = 'dueDateAsc';
+      if (elements.filterSortBy) elements.filterSortBy.value = 'dueDateAsc';
+      elements.filterButtons.forEach(b => {
+        if (b.getAttribute('data-filter') === 'pending') {
+          b.className = 'filter-btn px-3 py-1 rounded-lg font-medium transition-colors bg-slate-800 text-white';
+        } else {
+          b.className = 'filter-btn px-3 py-1 rounded-lg font-medium transition-colors text-slate-400 hover:text-white';
+        }
+      });
+      renderExpenses();
+      elements.expenseList.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
+
+  if (elements.cloneRecurringBtn) {
+    elements.cloneRecurringBtn.addEventListener('click', cloneRecurringToNextMonth);
+  }
+
+  // ==========================================
+  // MODAL DE ORÇAMENTOS POR CATEGORIA (BUDGETS)
+  // ==========================================
+  const openBudgetModal = () => {
+    if (!elements.budgetModal) return;
+    renderBudgetInputs();
+    elements.budgetModal.classList.remove('hidden');
+    elements.budgetModal.classList.add('flex');
+  };
+
+  const closeBudgetModal = () => {
+    if (!elements.budgetModal) return;
+    elements.budgetModal.classList.add('hidden');
+    elements.budgetModal.classList.remove('flex');
+  };
+
+  if (elements.openBudgetModalBtn) {
+    elements.openBudgetModalBtn.addEventListener('click', openBudgetModal);
+  }
+  if (elements.closeBudgetModalBtn) {
+    elements.closeBudgetModalBtn.addEventListener('click', closeBudgetModal);
+  }
+  if (elements.cancelBudgetModalBtn) {
+    elements.cancelBudgetModalBtn.addEventListener('click', closeBudgetModal);
+  }
+  if (elements.budgetModal) {
+    elements.budgetModal.addEventListener('click', (e) => {
+      if (e.target === elements.budgetModal) closeBudgetModal();
+    });
+  }
+
+  if (elements.budgetForm) {
+    elements.budgetForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const inputs = elements.budgetInputsContainer.querySelectorAll('input[data-budget-cat]');
+      const updatedBudgets = {};
+      inputs.forEach(inp => {
+        const cat = inp.getAttribute('data-budget-cat');
+        updatedBudgets[cat] = Math.max(0, parseFloat(inp.value) || 0);
+      });
+
+      state.budgets = { ...state.budgets, ...updatedBudgets };
+
+      if (useFirestore && firestoreDb) {
+        try {
+          await firestoreDb.collection('budgets').doc('categories').set(state.budgets);
+          showToast('Limites de orçamento atualizados na nuvem!', 'success');
+        } catch (err) {
+          console.error('Erro ao salvar orçamentos:', err);
+          showToast('Erro ao sincronizar na nuvem: ' + err.message, 'error');
+        }
+      } else if (state.isOnline) {
+        try {
+          await fetch('/api/budgets', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(state.budgets)
+          });
+          showToast('Limites de orçamento atualizados com sucesso!', 'success');
+        } catch (err) {
+          showToast('Limites salvos localmente.', 'info');
+        }
+      } else {
+        showToast('Limites de orçamento salvos localmente.', 'success');
+      }
+
+      saveLocalData();
+      closeBudgetModal();
+      renderAll();
+    });
+  }
+
+  // ==========================================
+  // MODAL DE META DE ECONOMIA (PAGUE-SE PRIMEIRO)
+  // ==========================================
+  const openSavingsModal = () => {
+    if (!elements.savingsGoalModal) return;
+    if (elements.savingsMonthlyTargetInput) {
+      elements.savingsMonthlyTargetInput.value = state.savingsGoal.monthlyTarget || 1000;
+    }
+    if (elements.savingsPriorityModeToggle) {
+      elements.savingsPriorityModeToggle.checked = Boolean(state.savingsGoal.priorityMode);
+    }
+    elements.savingsGoalModal.classList.remove('hidden');
+    elements.savingsGoalModal.classList.add('flex');
+  };
+
+  const closeSavingsModal = () => {
+    if (!elements.savingsGoalModal) return;
+    elements.savingsGoalModal.classList.add('hidden');
+    elements.savingsGoalModal.classList.remove('flex');
+  };
+
+  if (elements.openSavingsGoalModalBtn) {
+    elements.openSavingsGoalModalBtn.addEventListener('click', openSavingsModal);
+  }
+  if (elements.closeSavingsModalBtn) {
+    elements.closeSavingsModalBtn.addEventListener('click', closeSavingsModal);
+  }
+  if (elements.cancelSavingsModalBtn) {
+    elements.cancelSavingsModalBtn.addEventListener('click', closeSavingsModal);
+  }
+  if (elements.savingsGoalModal) {
+    elements.savingsGoalModal.addEventListener('click', (e) => {
+      if (e.target === elements.savingsGoalModal) closeSavingsModal();
+    });
+  }
+
+  if (elements.savingsGoalForm) {
+    elements.savingsGoalForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const target = parseFloat(elements.savingsMonthlyTargetInput.value);
+      const priorityMode = elements.savingsPriorityModeToggle.checked;
+
+      if (isNaN(target) || target < 0) {
+        showToast('Informe um valor de meta válido.', 'error');
+        return;
+      }
+
+      state.savingsGoal = {
+        ...state.savingsGoal,
+        monthlyTarget: target,
+        priorityMode: priorityMode
+      };
+
+      if (useFirestore && firestoreDb) {
+        try {
+          await firestoreDb.collection('settings').doc('savingsGoal').set(state.savingsGoal);
+          showToast('Meta de economia atualizada na nuvem!', 'success');
+        } catch (err) {
+          console.error('Erro ao salvar meta no Firestore:', err);
+          showToast('Erro ao sincronizar na nuvem: ' + err.message, 'error');
+        }
+      } else if (state.isOnline) {
+        try {
+          await fetch('/api/savings-goal', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(state.savingsGoal)
+          });
+          showToast('Meta de economia atualizada com sucesso!', 'success');
+        } catch (err) {
+          showToast('Meta salva localmente.', 'info');
+        }
+      } else {
+        showToast('Meta salva localmente.', 'success');
+      }
+
+      saveLocalData();
+      closeSavingsModal();
+      renderAll();
+    });
+  }
 
   // ==========================================
   // MODAL DE CONFIRMAÇÃO DE EXCLUSÃO
@@ -1032,6 +1813,9 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.editExpenseCategory.value = expense.category || 'Moradia';
     elements.editExpensePaymentUrl.value = expense.paymentUrl || '';
     elements.editExpensePaid.checked = Boolean(expense.paid);
+    if (elements.editExpenseRecurring) {
+      elements.editExpenseRecurring.checked = Boolean(expense.recurring);
+    }
 
     elements.editExpenseModal.classList.remove('hidden');
     elements.editExpenseModal.classList.add('flex');
@@ -1068,6 +1852,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const category = elements.editExpenseCategory.value;
       const paymentUrl = elements.editExpensePaymentUrl ? elements.editExpensePaymentUrl.value.trim() : '';
       const paid = elements.editExpensePaid.checked;
+      const recurring = Boolean(elements.editExpenseRecurring && elements.editExpenseRecurring.checked);
 
       if (!description || isNaN(amount) || amount <= 0) {
         showToast('Preencha a descrição e um valor positivo válido.', 'error');
@@ -1081,6 +1866,7 @@ document.addEventListener('DOMContentLoaded', () => {
         category,
         paymentUrl: paymentUrl || '',
         paid,
+        recurring,
         updatedAt: new Date().toISOString()
       };
 

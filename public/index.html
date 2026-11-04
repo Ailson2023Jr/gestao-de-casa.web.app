@@ -132,9 +132,10 @@
           </div>
         </div>
         <div class="text-2xl font-extrabold text-emerald-400" id="cardTotalIncome">R$ 0,00</div>
-        <p class="text-xs text-slate-500 mt-2 flex items-center gap-1">
-          <span id="countIncomes">0</span> fontes cadastradas
-        </p>
+        <div class="flex items-center justify-between text-xs text-slate-500 mt-2">
+          <span><span id="countIncomes">0</span> fontes</span>
+          <span id="momIncomeBadge" class="font-semibold text-emerald-400 text-[11px] hidden">--</span>
+        </div>
       </div>
 
       <!-- Card 2: Total de Contas -->
@@ -148,12 +149,13 @@
           </div>
         </div>
         <div class="text-2xl font-extrabold text-rose-400" id="cardTotalExpenses">R$ 0,00</div>
-        <p class="text-xs text-slate-500 mt-2 flex items-center gap-1">
-          <span id="countExpenses">0</span> contas cadastradas
-        </p>
+        <div class="flex items-center justify-between text-xs text-slate-500 mt-2">
+          <span><span id="countExpenses">0</span> contas</span>
+          <span id="momExpenseBadge" class="font-semibold text-rose-400 text-[11px] hidden">--</span>
+        </div>
       </div>
 
-      <!-- Card 3: Saldo Restante -->
+      <!-- Card 3: Saldo Líquido & Livre -->
       <div class="glass-panel p-5 rounded-2xl relative overflow-hidden group hover:border-blue-500/40 transition-smooth">
         <div class="flex items-center justify-between mb-3">
           <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Saldo Líquido</span>
@@ -164,7 +166,10 @@
           </div>
         </div>
         <div class="text-2xl font-extrabold text-blue-400" id="cardBalance">R$ 0,00</div>
-        <p class="text-xs text-slate-500 mt-2" id="balanceStatusText">Disponível no mês</p>
+        <p class="text-xs text-slate-500 mt-2 flex items-center justify-between" id="balanceStatusText">
+          <span>Disponível no mês</span>
+          <span id="freeSpendableBadge" class="text-[10px] text-indigo-400 font-semibold hidden"></span>
+        </p>
       </div>
 
       <!-- Card 4: Status Pagamento -->
@@ -257,6 +262,99 @@
       </div>
     </section>
 
+    <!-- BLOCO ESTRATÉGICO: "PAGUE-SE PRIMEIRO" (RESERVA) & "ORÇAMENTOS POR CATEGORIA" -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- CARD: GESTÃO DE METAS DE ECONOMIA (PAGUE-SE PRIMEIRO) -->
+      <div class="lg:col-span-5 glass-panel p-6 rounded-3xl border border-slate-800 space-y-4 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-bold text-white text-base">Pague-se Primeiro</h3>
+              <p class="text-xs text-slate-400">Meta prioritária de reserva & investimentos</p>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            id="openSavingsGoalModalBtn" 
+            title="Ajustar Meta de Reserva"
+            class="p-2 rounded-xl bg-slate-800/80 hover:bg-purple-500/20 text-slate-400 hover:text-purple-300 transition-colors"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 pt-1">
+          <div class="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800">
+            <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Meta Mensal</span>
+            <span class="text-base font-extrabold text-purple-400 mt-1 block" id="savingsTargetDisplay">R$ 1.000,00</span>
+          </div>
+          <div class="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800">
+            <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Reservado</span>
+            <span class="text-base font-extrabold text-emerald-400 mt-1 block" id="savingsSavedDisplay">R$ 0,00</span>
+          </div>
+        </div>
+
+        <!-- Barra de Progresso da Meta -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400" id="savingsStatusLabel">Progresso da economia</span>
+            <span class="font-bold text-purple-300" id="savingsProgressPercent">0%</span>
+          </div>
+          <div class="w-full h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800 p-0.5">
+            <div id="savingsProgressBar" class="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Indicador de Saldo Livre Protegido -->
+        <div class="p-3 rounded-2xl bg-purple-500/10 border border-purple-500/25 flex items-center justify-between text-xs">
+          <div>
+            <span class="text-purple-300 font-semibold block">Saldo Livre para Gastos Diários:</span>
+            <span class="text-[11px] text-slate-400">Protege a meta de reserva antes de gastar</span>
+          </div>
+          <span class="text-sm font-extrabold text-white" id="effectiveFreeSpendable">R$ 0,00</span>
+        </div>
+      </div>
+
+      <!-- CARD: ORÇAMENTOS POR CATEGORIA (LIMITES DE GASTOS) -->
+      <div class="lg:col-span-7 glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-bold text-white text-base">Orçamentos por Categoria</h3>
+              <p class="text-xs text-slate-400">Acompanhe se os gastos respeitam os tetos definidos</p>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            id="openBudgetModalBtn" 
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-cyan-300 hover:text-white border border-cyan-500/20 transition-all"
+          >
+            <span>⚙️ Ajustar Tetos</span>
+          </button>
+        </div>
+
+        <!-- Grade de Barras de Orçamento -->
+        <div id="budgetBarsContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto pr-1">
+          <!-- Renderizado via JS -->
+        </div>
+      </div>
+
+    </section>
+
     <!-- GRID EM 2 COLUNAS: RECEITAS (ESQUERDA) VS CONTAS A PAGAR (DIREITA) -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
@@ -311,19 +409,27 @@
                   <option value="Salário">Salário</option>
                   <option value="Freelance">Freelance</option>
                   <option value="Extra">Renda Extra</option>
-                  <option value="Investimentos">Investimentos</option>
+                  <option value="Investimentos / Reserva">Investimentos / Reserva</option>
                   <option value="Outros">Outros</option>
                 </select>
               </div>
             </div>
 
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">Data de Recebimento</label>
-              <input 
-                type="date" 
-                id="incomeDate" 
-                class="w-full px-3.5 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 transition-colors"
-              >
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Data de Recebimento</label>
+                <input 
+                  type="date" 
+                  id="incomeDate" 
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 transition-colors"
+                >
+              </div>
+              <div class="pt-3 sm:pt-4">
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" id="incomeRecurring" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700">
+                  <span class="text-xs font-medium text-slate-300">🔁 Repetir mensalmente</span>
+                </label>
+              </div>
             </div>
 
             <button 
@@ -421,6 +527,7 @@
                   <option value="Transporte">🚗 Transporte (Combustível, App)</option>
                   <option value="Saúde">💊 Saúde & Farmácia</option>
                   <option value="Lazer">🍿 Lazer & Streaming</option>
+                  <option value="Investimentos / Reserva">💎 Investimentos / Reserva</option>
                   <option value="Outros">📦 Outros</option>
                 </select>
               </div>
@@ -446,11 +553,17 @@
               </div>
             </div>
 
-            <div class="flex items-center justify-between pt-1">
-              <label class="flex items-center gap-2 cursor-pointer select-none">
-                <input type="checkbox" id="expensePaid" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700">
-                <span class="text-xs font-medium text-slate-300">Marcar esta conta como já paga</span>
-              </label>
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div class="flex items-center gap-4 flex-wrap">
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" id="expensePaid" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700">
+                  <span class="text-xs font-medium text-slate-300">Marcar como já paga</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" id="expenseRecurring" class="w-4 h-4 rounded text-rose-500 focus:ring-rose-500 bg-slate-900 border-slate-700">
+                  <span class="text-xs font-medium text-slate-300">🔁 Repetir mensalmente</span>
+                </label>
+              </div>
 
               <button 
                 type="submit" 
@@ -467,18 +580,84 @@
 
         <!-- Lista e Gerenciamento de Contas -->
         <div class="glass-panel p-6 rounded-3xl border border-slate-800">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-800/80">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-4 border-b border-slate-800/80">
             <div>
               <h3 class="font-bold text-white text-base">Contas do Mês</h3>
               <p class="text-xs text-slate-400">Clique no ícone de checagem para alternar status ou na lixeira para excluir</p>
             </div>
 
-            <!-- Filtros de Contas -->
+            <!-- Filtros de Status (Todas / Pendentes / Pagas) -->
             <div class="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
               <button data-filter="all" class="filter-btn px-3 py-1 rounded-lg font-medium transition-colors bg-slate-800 text-white">Todas</button>
               <button data-filter="pending" class="filter-btn px-3 py-1 rounded-lg font-medium transition-colors text-slate-400 hover:text-white">Pendentes</button>
               <button data-filter="paid" class="filter-btn px-3 py-1 rounded-lg font-medium transition-colors text-slate-400 hover:text-white">Pagas</button>
             </div>
+          </div>
+
+          <!-- BANNER DE ALERTAS DE VENCIMENTO (VENCE HOJE OU ATRASADA) -->
+          <div id="dueAlertsBanner" class="hidden mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/80 via-slate-900 to-amber-950/60 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-3 shadow-lg alert-pulse">
+            <div class="flex items-center gap-2.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+              <div id="dueAlertsText" class="font-medium text-slate-200">
+                <!-- Mensagem dinâmica -->
+              </div>
+            </div>
+            <button 
+              type="button" 
+              id="focusUrgentExpensesBtn" 
+              class="px-3 py-1 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] shadow-sm transition-colors whitespace-nowrap"
+            >
+              Ver Urgentes
+            </button>
+          </div>
+
+          <!-- BARRA DE FILTROS AVANÇADOS E ORDENAÇÃO -->
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4 bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80">
+            <div class="flex items-center gap-2 flex-wrap flex-1">
+              <!-- Filtro por Categoria -->
+              <select id="filterCategory" class="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-indigo-500">
+                <option value="all">Todas as Categorias</option>
+                <option value="Moradia">🏠 Moradia</option>
+                <option value="Serviços">💡 Serviços</option>
+                <option value="Alimentação">🛒 Alimentação</option>
+                <option value="Cartão">💳 Cartão</option>
+                <option value="Transporte">🚗 Transporte</option>
+                <option value="Saúde">💊 Saúde</option>
+                <option value="Lazer">🍿 Lazer</option>
+                <option value="Investimentos / Reserva">💎 Investimentos / Reserva</option>
+                <option value="Outros">📦 Outros</option>
+              </select>
+
+              <!-- Faixa de Valor (Mín / Máx) -->
+              <div class="flex items-center gap-1">
+                <input type="number" id="filterMinAmount" placeholder="Min R$" step="10" class="w-20 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                <span class="text-slate-600 text-xs">-</span>
+                <input type="number" id="filterMaxAmount" placeholder="Max R$" step="10" class="w-20 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+              </div>
+
+              <!-- Ordenação -->
+              <select id="filterSortBy" class="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-indigo-500">
+                <option value="dueDateAsc">⏳ Mais próximas do vencimento</option>
+                <option value="dueDateDesc">⌛ Vencimento mais distante</option>
+                <option value="amountDesc">💰 Maior valor</option>
+                <option value="amountAsc">🏷️ Menor valor</option>
+                <option value="descAsc">🔤 Descrição (A-Z)</option>
+              </select>
+
+              <button type="button" id="clearFiltersBtn" title="Limpar filtros" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs transition-colors">
+                ✖ Limpar
+              </button>
+            </div>
+
+            <!-- Botão de Replicar Contas Fixas para o Próximo Mês -->
+            <button 
+              type="button" 
+              id="cloneRecurringBtn" 
+              title="Gera automaticamente as despesas e receitas recorrentes para o mês seguinte"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 hover:text-white text-xs font-semibold transition-all shadow-sm"
+            >
+              <span>🔁 Replicar Fixas no Próx. Mês</span>
+            </button>
           </div>
 
           <!-- Container da Lista de Contas -->
@@ -698,6 +877,7 @@
             <option value="Transporte">🚗 Transporte (Combustível, App)</option>
             <option value="Saúde">💊 Saúde & Farmácia</option>
             <option value="Lazer">🍿 Lazer & Streaming</option>
+            <option value="Investimentos / Reserva">💎 Investimentos / Reserva</option>
             <option value="Outros">📦 Outros</option>
           </select>
         </div>
@@ -721,10 +901,14 @@
           </div>
         </div>
 
-        <div class="pt-1">
+        <div class="flex items-center justify-between pt-1 flex-wrap gap-2">
           <label class="flex items-center gap-2 cursor-pointer select-none">
             <input type="checkbox" id="editExpensePaid" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700">
             <span class="text-xs font-medium text-slate-300">Esta conta já foi paga</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" id="editExpenseRecurring" class="w-4 h-4 rounded text-rose-500 focus:ring-rose-500 bg-slate-900 border-slate-700">
+            <span class="text-xs font-medium text-slate-300">🔁 Repetir mensalmente</span>
           </label>
         </div>
 
@@ -741,6 +925,103 @@
             class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 transition-smooth"
           >
             Salvar Alterações
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIGURAÇÃO DE LIMITES DE ORÇAMENTO (BUDGETS) -->
+  <div id="budgetModal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="glass-panel max-w-lg w-full p-6 sm:p-7 rounded-3xl border border-slate-700 shadow-2xl relative space-y-5 my-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">Tetos de Gastos Mensais</h3>
+            <p class="text-xs text-slate-400">Defina o orçamento máximo tolerado para cada categoria</p>
+          </div>
+        </div>
+        <button id="closeBudgetModalBtn" type="button" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form id="budgetForm" class="space-y-3.5 max-h-[60vh] overflow-y-auto pr-1">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="budgetInputsContainer">
+          <!-- Inserido dinamicamente via JS -->
+        </div>
+
+        <div class="flex gap-3 pt-3 border-t border-slate-800">
+          <button type="button" id="cancelBudgetModalBtn" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors">
+            Cancelar
+          </button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-semibold text-white shadow-lg shadow-cyan-600/30 transition-smooth">
+            Salvar Orçamentos
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE META DE ECONOMIA (PAGUE-SE PRIMEIRO) -->
+  <div id="savingsGoalModal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="glass-panel max-w-md w-full p-6 sm:p-7 rounded-3xl border border-slate-700 shadow-2xl relative space-y-5 my-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Meta: Pague-se Primeiro</h3>
+            <p class="text-xs text-slate-400">Proteja a sua reserva antes dos gastos diários</p>
+          </div>
+        </div>
+        <button id="closeSavingsModalBtn" type="button" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form id="savingsGoalForm" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Meta de Economia Mensal (R$) *</label>
+          <input 
+            type="number" 
+            step="50" 
+            min="0" 
+            id="savingsMonthlyTargetInput" 
+            required
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm font-bold text-purple-300 focus:outline-none focus:border-purple-500 transition-colors"
+          >
+          <p class="text-[11px] text-slate-500 mt-1">Quanto a família pretende guardar todo mês para a reserva de emergência/investimentos.</p>
+        </div>
+
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+          <label class="flex items-center justify-between cursor-pointer select-none">
+            <span class="text-xs font-semibold text-slate-200">Modo Prioritário Ativo</span>
+            <input type="checkbox" id="savingsPriorityModeToggle" class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 bg-slate-950 border-slate-700">
+          </label>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            Quando ativo, a meta de economia é debitada visualmente do saldo livre logo no dia 1º, incentivando guardar antes de fazer gastos variáveis.
+          </p>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="button" id="cancelSavingsModalBtn" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors">
+            Cancelar
+          </button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white shadow-lg shadow-purple-600/30 transition-smooth">
+            Salvar Meta
           </button>
         </div>
       </form>
