@@ -5,28 +5,32 @@
       "description": "Sobra das receitas anteriores",
       "amount": 2237,
       "category": "Outros",
-      "date": "2026-11-01"
+      "date": "2026-11-01",
+      "recurring": false
     },
     {
       "id": "inc-1793493171693",
       "description": "Salário Bia",
       "amount": 5670,
       "category": "Salário",
-      "date": "2026-11-02"
+      "date": "2026-11-02",
+      "recurring": true
     },
     {
       "id": "inc-1793480446430",
       "description": "Vale Junior",
       "amount": 2191,
       "category": "Salário",
-      "date": "2026-10-15"
+      "date": "2026-10-15",
+      "recurring": true
     },
     {
       "id": "inc-1793479073783",
       "description": "Salário Junior",
       "amount": 2717.88,
       "category": "Salário",
-      "date": "2026-10-30"
+      "date": "2026-10-30",
+      "recurring": true
     }
   ],
   "expenses": [
@@ -36,7 +40,8 @@
       "amount": 219.48,
       "dueDate": "2026-11-01",
       "category": "Serviços",
-      "paid": false
+      "paid": false,
+      "recurring": true
     },
     {
       "id": "exp-1793495054995",
@@ -44,7 +49,8 @@
       "amount": 572,
       "dueDate": "2026-11-15",
       "category": "Transporte",
-      "paid": false
+      "paid": false,
+      "recurring": true
     },
     {
       "id": "exp-1793495031428",
@@ -52,7 +58,8 @@
       "amount": 42.89,
       "dueDate": "2026-11-15",
       "category": "Moradia",
-      "paid": false
+      "paid": false,
+      "recurring": true
     },
     {
       "id": "exp-1793495010870",
@@ -60,7 +67,8 @@
       "amount": 787.87,
       "dueDate": "2026-11-15",
       "category": "Cartão",
-      "paid": false
+      "paid": false,
+      "recurring": false
     },
     {
       "id": "exp-1793494909597",
@@ -68,7 +76,8 @@
       "amount": 643,
       "dueDate": "2026-11-15",
       "category": "Moradia",
-      "paid": false
+      "paid": false,
+      "recurring": true
     },
     {
       "id": "exp-1793494874754",
@@ -76,7 +85,8 @@
       "amount": 2378.73,
       "dueDate": "2026-11-15",
       "category": "Cartão",
-      "paid": false
+      "paid": false,
+      "recurring": false
     },
     {
       "id": "exp-1793494176824",
@@ -84,7 +94,8 @@
       "amount": 20,
       "dueDate": "2026-11-05",
       "category": "Outros",
-      "paid": false
+      "paid": false,
+      "recurring": true
     },
     {
       "id": "exp-1793494140079",
@@ -92,7 +103,8 @@
       "amount": 9,
       "dueDate": "2026-11-05",
       "category": "Lazer",
-      "paid": false
+      "paid": false,
+      "recurring": true
     },
     {
       "id": "exp-1793494096999",
@@ -101,7 +113,8 @@
       "dueDate": "2026-10-31",
       "category": "Transporte",
       "paymentUrl": "https://nubank.com.br",
-      "paid": false
+      "paid": false,
+      "recurring": false
     },
     {
       "id": "exp-1793494076341",
@@ -109,7 +122,8 @@
       "amount": 200,
       "dueDate": "2026-11-05",
       "category": "Saúde",
-      "paid": false
+      "paid": false,
+      "recurring": true
     },
     {
       "id": "exp-1793494041803",
@@ -117,7 +131,8 @@
       "amount": 170,
       "dueDate": "2026-11-05",
       "category": "Transporte",
-      "paid": false
+      "paid": false,
+      "recurring": true
     },
     {
       "id": "exp-1793493984694",
@@ -125,7 +140,8 @@
       "amount": 6609.48,
       "dueDate": "2026-11-02",
       "category": "Cartão",
-      "paid": false
+      "paid": false,
+      "recurring": false
     },
     {
       "id": "exp-1793493928296",
@@ -133,7 +149,8 @@
       "amount": 80,
       "dueDate": "2026-11-05",
       "category": "Outros",
-      "paid": false
+      "paid": false,
+      "recurring": true
     },
     {
       "id": "exp-1793479004271",
@@ -141,7 +158,34 @@
       "amount": 99,
       "dueDate": "2026-11-01",
       "category": "Serviços",
-      "paid": true
+      "paid": true,
+      "recurring": true
+    },
+    {
+      "id": "exp-1793578000001",
+      "description": "Aporte Reserva de Emergência",
+      "amount": 500,
+      "dueDate": "2026-11-05",
+      "category": "Investimentos / Reserva",
+      "paid": true,
+      "recurring": true
     }
-  ]
+  ],
+  "budgets": {
+    "Moradia": 2500,
+    "Serviços": 500,
+    "Alimentação": 1500,
+    "Cartão": 7500,
+    "Transporte": 1000,
+    "Saúde": 500,
+    "Lazer": 300,
+    "Investimentos / Reserva": 1000,
+    "Outros": 500
+  },
+  "savingsGoal": {
+    "monthlyTarget": 1000,
+    "initialReserve": 2500,
+    "priorityMode": true,
+    "updatedAt": "2026-11-03T20:00:00.000Z"
+  }
 }

@@ -14,6 +14,7 @@ rules_version = '2';
 //   - amount: number (required, > 0 and <= 100000000) - Valor monetário positivo da receita
 //   - category: string (optional, 1-50 chars) - Categoria da receita (ex: "Salário", "Extra", "Outros")
 //   - date: string (required, format YYYY-MM-DD or ISO 8601, 10-35 chars) - Data do recebimento
+//   - recurring: bool (optional, boolean) - Indicador se a receita é recorrente/fixa
 //   - uid: string (optional, 1-128 chars, immutable) - UID do usuário autenticado no Firebase Auth
 //   - createdAt: timestamp | string (optional, immutable) - Data de criação do registro
 //   - updatedAt: timestamp | string (optional) - Data de atualização do registro
@@ -28,9 +29,29 @@ rules_version = '2';
 //   - category: string (optional, 1-50 chars) - Categoria da despesa (ex: "Moradia", "Serviços", "Alimentação", "Cartão", "Transporte", "Saúde", "Lazer", "Outros")
 //   - paid: bool (optional, boolean) - Indicador se a despesa já foi paga ou está pendente
 //   - paymentUrl: string (optional, 0-500 chars) - Link ou URL para pagamento/código de barras da conta
+//   - recurring: bool (optional, boolean) - Indicador se a conta/despesa é recorrente/fixa
 //   - uid: string (optional, 1-128 chars, immutable) - UID do usuário autenticado no Firebase Auth
 //   - createdAt: timestamp | string (optional, immutable) - Data de criação do registro
 //   - updatedAt: timestamp | string (optional) - Data de atualização do registro
+//
+// Collection: budgets
+// Document ID: string representing the category (e.g. "Moradia", "Alimentação") or auto-generated string ID
+// Fields:
+//   - id: string (optional, 1-64 chars) - Identificador do orçamento
+//   - category: string (optional, 1-50 chars) - Categoria orçamentária
+//   - monthlyLimit: number (required, >= 0 and <= 100000000) - Teto/limite de gastos mensal estipulado
+//   - uid: string (optional, 1-128 chars, immutable) - UID do usuário autenticado no Firebase Auth
+//   - createdAt: timestamp | string (optional, immutable) - Data de criação do registro
+//   - updatedAt: timestamp | string (optional) - Data de atualização do registro
+//
+// Collection: settings
+// Document ID: string representing configuration key (e.g. "savingsGoal", "preferences")
+// Fields:
+//   - id: string (optional, 1-64 chars) - Identificador da configuração
+//   - uid: string (optional, 1-128 chars, immutable) - UID do usuário autenticado no Firebase Auth
+//   - createdAt: timestamp | string (optional, immutable) - Data de criação do registro
+//   - updatedAt: timestamp | string (optional) - Data de atualização do registro
+//   - [custom configuration fields, e.g. monthlyTarget, initialReserve, priorityMode]
 //
 // ===============================================================
 
@@ -99,7 +120,7 @@ service cloud.firestore {
 
     // Validates 'incomes' document schema, types, limits and required fields
     function isValidIncome(data) {
-      let allowedFields = ['id', 'description', 'amount', 'category', 'date', 'uid', 'createdAt', 'updatedAt'];
+      let allowedFields = ['id', 'description', 'amount', 'category', 'date', 'recurring', 'uid', 'createdAt', 'updatedAt'];
       let requiredFields = ['description', 'amount', 'date'];
 
       return data.keys().hasAll(requiredFields) &&
@@ -111,6 +132,7 @@ service cloud.firestore {
              data.amount > 0 &&
              data.amount <= 100000000 &&
              isValidDateString(data.date) &&
+             (!('recurring' in data) || data.recurring is bool) &&
              (!('category' in data) || (data.category is string && data.category.size() >= 1 && data.category.size() <= 50)) &&
              (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 64)) &&
              (!('uid' in data) || (data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128)) &&
@@ -120,7 +142,7 @@ service cloud.firestore {
 
     // Validates 'expenses' document schema, types, limits and required fields
     function isValidExpense(data) {
-      let allowedFields = ['id', 'description', 'amount', 'dueDate', 'category', 'paid', 'paymentUrl', 'uid', 'createdAt', 'updatedAt'];
+      let allowedFields = ['id', 'description', 'amount', 'dueDate', 'category', 'paid', 'paymentUrl', 'recurring', 'uid', 'createdAt', 'updatedAt'];
       let requiredFields = ['description', 'amount', 'dueDate'];
 
       return data.keys().hasAll(requiredFields) &&
@@ -132,6 +154,7 @@ service cloud.firestore {
              data.amount > 0 &&
              data.amount <= 100000000 &&
              isValidDateString(data.dueDate) &&
+             (!('recurring' in data) || data.recurring is bool) &&
              (!('paid' in data) || data.paid is bool) &&
              (!('paymentUrl' in data) || (data.paymentUrl is string && data.paymentUrl.size() <= 500)) &&
              (!('category' in data) || (data.category is string && data.category.size() >= 1 && data.category.size() <= 50)) &&
@@ -139,6 +162,35 @@ service cloud.firestore {
              (!('uid' in data) || (data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128)) &&
              (!('createdAt' in data) || (data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 40))) &&
              (!('updatedAt' in data) || (data.updatedAt is timestamp || (data.updatedAt is string && data.updatedAt.size() <= 40)));
+    }
+
+    // Validates 'budgets' document schema, types, limits and required fields
+    function isValidBudget(data) {
+      let allowedFields = ['id', 'category', 'monthlyLimit', 'uid', 'createdAt', 'updatedAt'];
+      let requiredFields = ['monthlyLimit'];
+
+      return data.keys().hasAll(requiredFields) &&
+             data.keys().hasOnly(allowedFields) &&
+             data.monthlyLimit is number &&
+             data.monthlyLimit >= 0 &&
+             data.monthlyLimit <= 100000000 &&
+             (!('category' in data) || (data.category is string && data.category.size() >= 1 && data.category.size() <= 50)) &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 64)) &&
+             (!('uid' in data) || (data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128)) &&
+             (!('createdAt' in data) || (data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 40))) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp || (data.updatedAt is string && data.updatedAt.size() <= 40)));
+    }
+
+    // Validates 'settings' documents (e.g. 'savingsGoal', 'preferences')
+    function isValidSetting(data) {
+      return data.keys().size() <= 50 &&
+             (!('id' in data) || (data.id is string && data.id.size() >= 1 && data.id.size() <= 64)) &&
+             (!('uid' in data) || (data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128)) &&
+             (!('createdAt' in data) || (data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 40))) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp || (data.updatedAt is string && data.updatedAt.size() <= 40))) &&
+             (!('monthlyTarget' in data) || (data.monthlyTarget is number && data.monthlyTarget >= 0 && data.monthlyTarget <= 100000000)) &&
+             (!('initialReserve' in data) || (data.initialReserve is number && data.initialReserve >= 0 && data.initialReserve <= 100000000)) &&
+             (!('priorityMode' in data) || data.priorityMode is bool);
     }
 
     // ===============================================================
@@ -179,6 +231,48 @@ service cloud.firestore {
       // Allow document updates (e.g. marking as paid, updating value or dueDate)
       allow update: if isAuthorized() &&
                        isValidExpense(request.resource.data) &&
+                       uidNotModified() &&
+                       areImmutableFieldsUnchanged(['id', 'createdAt']);
+
+      // Allow document deletion
+      allow delete: if isAuthorized() &&
+                       (!('uid' in resource.data) || isDocOwner() || isPrototypeMode());
+    }
+
+    // Budgets Collection (Orçamentos por categoria)
+    match /budgets/{budgetId} {
+      // Allow read operations
+      allow read: if isAuthorized();
+
+      // Allow document creation with full schema validation and UID protection
+      allow create: if isAuthorized() &&
+                       isValidBudget(request.resource.data) &&
+                       uidUnchanged();
+
+      // Allow document updates with full schema validation and immutable field protection
+      allow update: if isAuthorized() &&
+                       isValidBudget(request.resource.data) &&
+                       uidNotModified() &&
+                       areImmutableFieldsUnchanged(['id', 'createdAt']);
+
+      // Allow document deletion
+      allow delete: if isAuthorized() &&
+                       (!('uid' in resource.data) || isDocOwner() || isPrototypeMode());
+    }
+
+    // Settings Collection (Configurações do sistema, ex: savingsGoal, preferences)
+    match /settings/{settingId} {
+      // Allow read operations
+      allow read: if isAuthorized();
+
+      // Allow document creation with full schema validation and UID protection
+      allow create: if isAuthorized() &&
+                       isValidSetting(request.resource.data) &&
+                       uidUnchanged();
+
+      // Allow document updates with schema validation and immutable field protection
+      allow update: if isAuthorized() &&
+                       isValidSetting(request.resource.data) &&
                        uidNotModified() &&
                        areImmutableFieldsUnchanged(['id', 'createdAt']);
 

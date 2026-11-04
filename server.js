@@ -46,14 +46,113 @@ function writeDB(data) {
 }
 
 function computeSummary(db) {
-  const totalIncome = db.incomes.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-  const totalExpense = db.expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-  const totalPaid = db.expenses
+  const incomes = db.incomes || [];
+  const expenses = db.expenses || [];
+  const budgets = db.budgets || {
+    "Moradia": 2500,
+    "Serviços": 500,
+    "Alimentação": 1500,
+    "Cartão": 7500,
+    "Transporte": 1000,
+    "Saúde": 500,
+    "Lazer": 300,
+    "Investimentos / Reserva": 1000,
+    "Outros": 500
+  };
+  const savingsGoal = db.savingsGoal || {
+    monthlyTarget: 1000,
+    initialReserve: 2500,
+    priorityMode: true
+  };
+
+  const totalIncome = incomes.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+  const totalExpense = expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+  const totalPaid = expenses
     .filter(e => e.paid)
     .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   const totalPending = totalExpense - totalPaid;
   const balance = totalIncome - totalExpense;
   const expensePercentage = totalIncome > 0 ? (totalExpense / totalIncome) * 100 : (totalExpense > 0 ? 100 : 0);
+
+  // Identificação do mês mais recente e do mês anterior para MoM (Month over Month)
+  const monthsFound = [...new Set([
+    ...incomes.map(i => (i.date ? i.date.substring(0, 7) : '')),
+    ...expenses.map(e => (e.dueDate ? e.dueDate.substring(0, 7) : ''))
+  ])].filter(Boolean).sort();
+
+  const currentMonth = monthsFound[monthsFound.length - 1] || new Date().toISOString().substring(0, 7);
+  const prevMonthIndex = monthsFound.indexOf(currentMonth) - 1;
+  const prevMonth = prevMonthIndex >= 0 ? monthsFound[prevMonthIndex] : null;
+
+  // Cálculos do Mês Corrente
+  const currMonthExpenses = expenses.filter(e => e.dueDate && e.dueDate.startsWith(currentMonth));
+  const currMonthIncomes = incomes.filter(i => i.date && i.date.startsWith(currentMonth));
+  const currMonthExpenseTotal = currMonthExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const currMonthIncomeTotal = currMonthIncomes.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+
+  // Análise MoM (Month over Month)
+  let mom = null;
+  if (prevMonth) {
+    const prevMonthExpenses = expenses.filter(e => e.dueDate && e.dueDate.startsWith(prevMonth));
+    const prevMonthIncomes = incomes.filter(i => i.date && i.date.startsWith(prevMonth));
+    const prevExpTotal = prevMonthExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const prevIncTotal = prevMonthIncomes.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+
+    const expenseDiff = currMonthExpenseTotal - prevExpTotal;
+    const expenseChangePct = prevExpTotal > 0 ? (expenseDiff / prevExpTotal) * 100 : 0;
+    const incomeDiff = currMonthIncomeTotal - prevIncTotal;
+    const incomeChangePct = prevIncTotal > 0 ? (incomeDiff / prevIncTotal) * 100 : 0;
+
+    mom = {
+      currentMonth,
+      prevMonth,
+      prevExpTotal,
+      prevIncTotal,
+      currMonthExpenseTotal,
+      currMonthIncomeTotal,
+      expenseDiff,
+      expenseChangePct: Number(expenseChangePct.toFixed(1)),
+      incomeDiff,
+      incomeChangePct: Number(incomeChangePct.toFixed(1))
+    };
+  }
+
+  // Gestão de Metas de Economia ("Pague-se Primeiro")
+  const reservedSavingsInExpenses = currMonthExpenses
+    .filter(e => e.category === 'Investimentos / Reserva' || e.category === 'Investimentos')
+    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+  const monthlySavingsTarget = Number(savingsGoal.monthlyTarget) || 1000;
+  const savingsProgressPct = monthlySavingsTarget > 0
+    ? Math.min(100, Number(((reservedSavingsInExpenses / monthlySavingsTarget) * 100).toFixed(1)))
+    : 0;
+
+  // Saldo Líquido "Livre para Gastos" (descontando o valor reservado ou a meta)
+  const effectiveSpendableBalance = savingsGoal.priorityMode
+    ? balance - Math.max(0, monthlySavingsTarget - reservedSavingsInExpenses)
+    : balance;
+
+  // Orçamentos por Categoria (Budgets)
+  const categoryBudgets = {};
+  Object.keys(budgets).forEach(cat => {
+    const limit = Number(budgets[cat]) || 0;
+    const spent = currMonthExpenses
+      .filter(e => e.category === cat)
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const percentage = limit > 0 ? Number(((spent / limit) * 100).toFixed(1)) : 0;
+    const remaining = limit - spent;
+    let status = 'ok';
+    if (percentage > 100) status = 'exceeded';
+    else if (percentage >= 80) status = 'warning';
+
+    categoryBudgets[cat] = {
+      limit,
+      spent,
+      remaining,
+      percentage,
+      status
+    };
+  });
 
   return {
     totalIncome,
@@ -61,7 +160,17 @@ function computeSummary(db) {
     totalPaid,
     totalPending,
     balance,
-    expensePercentage: Number(expensePercentage.toFixed(1))
+    effectiveSpendableBalance,
+    expensePercentage: Number(expensePercentage.toFixed(1)),
+    currentMonth,
+    mom,
+    savings: {
+      monthlyTarget: monthlySavingsTarget,
+      reservedAmount: reservedSavingsInExpenses,
+      progressPct: savingsProgressPct,
+      priorityMode: Boolean(savingsGoal.priorityMode)
+    },
+    categoryBudgets
   };
 }
 
@@ -123,9 +232,114 @@ const server = http.createServer(async (req, res) => {
         data: {
           incomes: db.incomes,
           expenses: db.expenses,
+          budgets: db.budgets || {},
+          savingsGoal: db.savingsGoal || {},
           summary
         }
       });
+    }
+
+    // PUT /api/budgets
+    if (pathname === '/api/budgets' && (method === 'PUT' || method === 'POST')) {
+      try {
+        const body = await parseBody(req);
+        if (!body.budgets || typeof body.budgets !== 'object') {
+          return sendJSON(res, 400, { success: false, error: 'Objeto de orçamentos inválido.' });
+        }
+        db.budgets = { ...(db.budgets || {}), ...body.budgets };
+        writeDB(db);
+        return sendJSON(res, 200, {
+          success: true,
+          data: db.budgets,
+          summary: computeSummary(db)
+        });
+      } catch (err) {
+        return sendJSON(res, 400, { success: false, error: 'JSON inválido.' });
+      }
+    }
+
+    // PUT /api/savings-goal
+    if (pathname === '/api/savings-goal' && (method === 'PUT' || method === 'POST')) {
+      try {
+        const body = await parseBody(req);
+        db.savingsGoal = {
+          ...(db.savingsGoal || {}),
+          ...body,
+          updatedAt: new Date().toISOString()
+        };
+        writeDB(db);
+        return sendJSON(res, 200, {
+          success: true,
+          data: db.savingsGoal,
+          summary: computeSummary(db)
+        });
+      } catch (err) {
+        return sendJSON(res, 400, { success: false, error: 'JSON inválido.' });
+      }
+    }
+
+    // POST /api/recurrence/clone-month
+    if (pathname === '/api/recurrence/clone-month' && method === 'POST') {
+      try {
+        const body = await parseBody(req);
+        const { fromMonth, toMonth } = body;
+        if (!fromMonth || !toMonth) {
+          return sendJSON(res, 400, { success: false, error: 'fromMonth e toMonth são obrigatórios (ex: 2026-11).' });
+        }
+
+        let clonedExpenses = 0;
+        let clonedIncomes = 0;
+
+        // Clona despesas recorrentes
+        const recurringExpenses = db.expenses.filter(e => e.recurring && e.dueDate && e.dueDate.startsWith(fromMonth));
+        recurringExpenses.forEach(exp => {
+          const day = exp.dueDate.split('-')[2] || '10';
+          const newDueDate = `${toMonth}-${day}`;
+          const exists = db.expenses.some(e => e.description === exp.description && e.dueDate && e.dueDate.startsWith(toMonth));
+          if (!exists) {
+            db.expenses.push({
+              id: 'exp-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+              description: exp.description,
+              amount: exp.amount,
+              dueDate: newDueDate,
+              category: exp.category,
+              paymentUrl: exp.paymentUrl || '',
+              paid: false,
+              recurring: true
+            });
+            clonedExpenses++;
+          }
+        });
+
+        // Clona receitas recorrentes
+        const recurringIncomes = db.incomes.filter(i => i.recurring && i.date && i.date.startsWith(fromMonth));
+        recurringIncomes.forEach(inc => {
+          const day = inc.date.split('-')[2] || '05';
+          const newDate = `${toMonth}-${day}`;
+          const exists = db.incomes.some(i => i.description === inc.description && i.date && i.date.startsWith(toMonth));
+          if (!exists) {
+            db.incomes.push({
+              id: 'inc-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+              description: inc.description,
+              amount: inc.amount,
+              category: inc.category,
+              date: newDate,
+              recurring: true
+            });
+            clonedIncomes++;
+          }
+        });
+
+        writeDB(db);
+        return sendJSON(res, 200, {
+          success: true,
+          message: `${clonedExpenses} contas e ${clonedIncomes} receitas recorrentes clonadas para ${toMonth}.`,
+          cloned: { expenses: clonedExpenses, incomes: clonedIncomes },
+          summary: computeSummary(db)
+        });
+      } catch (err) {
+        return sendJSON(res, 400, { success: false, error: 'Erro ao clonar mês: ' + err.message });
+      }
     }
 
     // POST /api/incomes
@@ -141,7 +355,8 @@ const server = http.createServer(async (req, res) => {
           description: String(body.description).trim(),
           amount: Math.abs(parseFloat(body.amount)) || 0,
           category: body.category || 'Geral',
-          date: body.date || new Date().toISOString().split('T')[0]
+          date: body.date || new Date().toISOString().split('T')[0],
+          recurring: Boolean(body.recurring)
         };
 
         db.incomes.unshift(newIncome);
@@ -190,7 +405,8 @@ const server = http.createServer(async (req, res) => {
           dueDate: body.dueDate || new Date().toISOString().split('T')[0],
           category: body.category || 'Outros',
           paymentUrl: body.paymentUrl ? String(body.paymentUrl).trim() : '',
-          paid: Boolean(body.paid)
+          paid: Boolean(body.paid),
+          recurring: Boolean(body.recurring)
         };
 
         db.expenses.unshift(newExpense);
@@ -223,6 +439,7 @@ const server = http.createServer(async (req, res) => {
         if (body.category !== undefined) expense.category = body.category;
         if (body.paymentUrl !== undefined) expense.paymentUrl = String(body.paymentUrl).trim();
         if (body.paid !== undefined) expense.paid = Boolean(body.paid);
+        if (body.recurring !== undefined) expense.recurring = Boolean(body.recurring);
 
         writeDB(db);
 
