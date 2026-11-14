@@ -432,6 +432,27 @@
               </div>
             </div>
 
+            <!-- Prazo de Recorrência para Receitas -->
+            <div id="incomeRecurringMonthsContainer" class="hidden p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs flex flex-wrap items-center gap-3">
+              <span class="text-slate-300 font-semibold flex items-center gap-1.5">
+                <span>🗓️ Prazo em Meses:</span>
+              </span>
+              <div class="flex items-center gap-2">
+                <input 
+                  type="number" 
+                  id="incomeRecurringMonths" 
+                  min="1" 
+                  max="120" 
+                  placeholder="Ex: 10" 
+                  class="w-24 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-emerald-400 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                >
+                <span class="text-slate-400 text-xs">meses</span>
+              </div>
+              <span class="text-[11px] text-slate-500">
+                💡 Deixe vazio para repetir sempre ou digite os meses (ex: 10).
+              </span>
+            </div>
+
             <button 
               type="submit" 
               class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg shadow-emerald-600/30 transition-smooth flex items-center justify-center gap-2"
@@ -553,27 +574,50 @@
               </div>
             </div>
 
-            <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
-              <div class="flex items-center gap-4 flex-wrap">
-                <label class="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" id="expensePaid" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700">
-                  <span class="text-xs font-medium text-slate-300">Marcar como já paga</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" id="expenseRecurring" class="w-4 h-4 rounded text-rose-500 focus:ring-rose-500 bg-slate-900 border-slate-700">
-                  <span class="text-xs font-medium text-slate-300">🔁 Repetir mensalmente</span>
-                </label>
+            <div class="space-y-2 pt-1">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-4 flex-wrap">
+                  <label class="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="expensePaid" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700">
+                    <span class="text-xs font-medium text-slate-300">Marcar como já paga</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="expenseRecurring" class="w-4 h-4 rounded text-rose-500 focus:ring-rose-500 bg-slate-900 border-slate-700">
+                    <span class="text-xs font-medium text-slate-300">🔁 Repetir mensalmente</span>
+                  </label>
+                </div>
+
+                <button 
+                  type="submit" 
+                  class="py-2.5 px-6 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm shadow-lg shadow-rose-600/30 transition-smooth flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                  </svg>
+                  Cadastrar Conta
+                </button>
               </div>
 
-              <button 
-                type="submit" 
-                class="py-2.5 px-6 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm shadow-lg shadow-rose-600/30 transition-smooth flex items-center gap-2"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                Cadastrar Conta
-              </button>
+              <!-- Prazo de Recorrência para Contas (Quantidade de Meses) -->
+              <div id="expenseRecurringMonthsContainer" class="hidden p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs flex flex-wrap items-center gap-3">
+                <span class="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <span>🗓️ Prazo em Meses:</span>
+                </span>
+                <div class="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    id="expenseRecurringMonths" 
+                    min="1" 
+                    max="120" 
+                    placeholder="Ex: 10" 
+                    class="w-24 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-rose-400 placeholder-slate-600 focus:outline-none focus:border-rose-500"
+                  >
+                  <span class="text-slate-400 text-xs">meses</span>
+                </div>
+                <span class="text-[11px] text-slate-500">
+                  💡 Ex: Digite <strong>10</strong> para gerar automaticamente as 10 parcelas mensais (1/10 a 10/10). Deixe vazio para repetir indefinidamente.
+                </span>
+              </div>
             </div>
           </form>
         </div>
@@ -901,15 +945,31 @@
           </div>
         </div>
 
-        <div class="flex items-center justify-between pt-1 flex-wrap gap-2">
-          <label class="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" id="editExpensePaid" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700">
-            <span class="text-xs font-medium text-slate-300">Esta conta já foi paga</span>
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" id="editExpenseRecurring" class="w-4 h-4 rounded text-rose-500 focus:ring-rose-500 bg-slate-900 border-slate-700">
-            <span class="text-xs font-medium text-slate-300">🔁 Repetir mensalmente</span>
-          </label>
+        <div class="space-y-2 pt-1">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" id="editExpensePaid" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700">
+              <span class="text-xs font-medium text-slate-300">Esta conta já foi paga</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" id="editExpenseRecurring" class="w-4 h-4 rounded text-rose-500 focus:ring-rose-500 bg-slate-900 border-slate-700">
+              <span class="text-xs font-medium text-slate-300">🔁 Repetir mensalmente</span>
+            </label>
+          </div>
+
+          <div id="editExpenseRecurringMonthsContainer" class="hidden p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs flex flex-wrap items-center gap-2">
+            <span class="text-slate-300 font-semibold">🗓️ Prazo em meses:</span>
+            <input 
+              type="number" 
+              id="editExpenseRecurringMonths" 
+              min="1" 
+              max="120" 
+              placeholder="Ex: 10" 
+              class="w-20 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs font-bold text-rose-400 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+            >
+            <span class="text-slate-400 text-xs">meses</span>
+            <span class="text-[10px] text-slate-500">(deixe vazio para contínuo)</span>
+          </div>
         </div>
 
         <div class="flex gap-3 pt-3 border-t border-slate-800">

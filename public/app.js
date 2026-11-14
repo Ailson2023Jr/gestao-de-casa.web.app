@@ -157,6 +157,8 @@ document.addEventListener('DOMContentLoaded', () => {
     incomeCategory: document.getElementById('incomeCategory'),
     incomeDate: document.getElementById('incomeDate'),
     incomeRecurring: document.getElementById('incomeRecurring'),
+    incomeRecurringMonthsContainer: document.getElementById('incomeRecurringMonthsContainer'),
+    incomeRecurringMonths: document.getElementById('incomeRecurringMonths'),
     incomeList: document.getElementById('incomeList'),
     incomeCountBadge: document.getElementById('incomeCountBadge'),
 
@@ -168,6 +170,8 @@ document.addEventListener('DOMContentLoaded', () => {
     expensePaymentUrl: document.getElementById('expensePaymentUrl'),
     expensePaid: document.getElementById('expensePaid'),
     expenseRecurring: document.getElementById('expenseRecurring'),
+    expenseRecurringMonthsContainer: document.getElementById('expenseRecurringMonthsContainer'),
+    expenseRecurringMonths: document.getElementById('expenseRecurringMonths'),
     expenseList: document.getElementById('expenseList'),
 
     // Alertas de Vencimento
@@ -195,6 +199,8 @@ document.addEventListener('DOMContentLoaded', () => {
     editExpensePaymentUrl: document.getElementById('editExpensePaymentUrl'),
     editExpensePaid: document.getElementById('editExpensePaid'),
     editExpenseRecurring: document.getElementById('editExpenseRecurring'),
+    editExpenseRecurringMonthsContainer: document.getElementById('editExpenseRecurringMonthsContainer'),
+    editExpenseRecurringMonths: document.getElementById('editExpenseRecurringMonths'),
     closeEditModalBtn: document.getElementById('closeEditModalBtn'),
     cancelEditModalBtn: document.getElementById('cancelEditModalBtn'),
 
@@ -265,6 +271,30 @@ document.addEventListener('DOMContentLoaded', () => {
       return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
     return dateStr;
+  };
+
+  // Adiciona N meses a uma data YYYY-MM-DD respeitando com precisão o fim de cada mês
+  const addMonthsToDate = (dateStr, monthsToAdd) => {
+    if (!dateStr) return dateStr;
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // 0 a 11
+    const day = parseInt(parts[2], 10);
+
+    const totalMonths = month + monthsToAdd;
+    const targetYear = year + Math.floor(totalMonths / 12);
+    const targetMonth = ((totalMonths % 12) + 12) % 12;
+
+    const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+    const safeDay = Math.min(day, daysInTargetMonth);
+
+    const yStr = String(targetYear);
+    const mStr = String(targetMonth + 1).padStart(2, '0');
+    const dStr = String(safeDay).padStart(2, '0');
+
+    return `${yStr}-${mStr}-${dStr}`;
   };
 
   // Exibir Toast
@@ -771,8 +801,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // CLONAGEM DE TRANSAÇÕES RECORRENTES (MÊS SEGUINTE)
   // ==========================================
   const cloneRecurringToNextMonth = async () => {
-    const recurringExpenses = state.expenses.filter(e => e.recurring);
-    const recurringIncomes = state.incomes.filter(i => i.recurring);
+    // Apenas transações recorrentes fixas contínuas (sem total de parcelas definido, pois as parceladas já foram pré-geradas)
+    const recurringExpenses = state.expenses.filter(e => e.recurring && !e.totalInstallments);
+    const recurringIncomes = state.incomes.filter(i => i.recurring && !i.totalInstallments);
 
     if (recurringExpenses.length === 0 && recurringIncomes.length === 0) {
       showToast('Nenhuma conta ou receita marcada como "Repetir mensalmente" ainda.', 'info');
@@ -1022,7 +1053,9 @@ document.addEventListener('DOMContentLoaded', () => {
       item.className = 'p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800/80 flex items-center justify-between gap-3 hover:border-emerald-500/30 transition-smooth group';
 
       const recurringBadge = income.recurring
-        ? `<span class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-medium" title="Receita mensal recorrente">🔁 Fixa</span>`
+        ? (income.installment && income.totalInstallments
+            ? `<span class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-medium" title="Parcela ${income.installment} de ${income.totalInstallments}">🔁 ${income.installment}/${income.totalInstallments}</span>`
+            : `<span class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-medium" title="Receita mensal recorrente contínua">🔁 Fixa</span>`)
         : '';
 
       item.innerHTML = `
@@ -1168,7 +1201,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const recurringBadge = exp.recurring
-        ? `<span class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-medium" title="Conta mensal recorrente">🔁 Fixa</span>`
+        ? (exp.installment && exp.totalInstallments
+            ? `<span class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-medium" title="Parcela ${exp.installment} de ${exp.totalInstallments}">🔁 ${exp.installment}/${exp.totalInstallments}</span>`
+            : `<span class="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-medium" title="Conta mensal recorrente contínua">🔁 Fixa</span>`)
         : '';
 
       item.innerHTML = `
@@ -1255,6 +1290,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  // Alternância dinâmica do campo de prazo (quantidade de meses) para Receitas
+  if (elements.incomeRecurring && elements.incomeRecurringMonthsContainer) {
+    elements.incomeRecurring.addEventListener('change', () => {
+      elements.incomeRecurringMonthsContainer.classList.toggle('hidden', !elements.incomeRecurring.checked);
+      if (!elements.incomeRecurring.checked && elements.incomeRecurringMonths) {
+        elements.incomeRecurringMonths.value = '';
+      }
+    });
+  }
+
+  // Alternância dinâmica do campo de prazo (quantidade de meses) para Contas
+  if (elements.expenseRecurring && elements.expenseRecurringMonthsContainer) {
+    elements.expenseRecurring.addEventListener('change', () => {
+      elements.expenseRecurringMonthsContainer.classList.toggle('hidden', !elements.expenseRecurring.checked);
+      if (!elements.expenseRecurring.checked && elements.expenseRecurringMonths) {
+        elements.expenseRecurringMonths.value = '';
+      }
+    });
+  }
+
   // ==========================================
   // EVENT LISTENERS: ADIÇÃO DE RECEITAS
   // ==========================================
@@ -1266,55 +1321,105 @@ document.addEventListener('DOMContentLoaded', () => {
     const category = elements.incomeCategory.value;
     const date = elements.incomeDate.value;
     const recurring = Boolean(elements.incomeRecurring && elements.incomeRecurring.checked);
+    const recurringMonths = recurring && elements.incomeRecurringMonths && elements.incomeRecurringMonths.value.trim()
+      ? parseInt(elements.incomeRecurringMonths.value, 10)
+      : null;
 
     if (!description || isNaN(amount) || amount <= 0) {
       showToast('Preencha a descrição e um valor positivo válido.', 'error');
       return;
     }
 
-    const newIncome = {
-      description,
-      amount,
-      category,
-      date,
-      recurring,
-      createdAt: new Date().toISOString()
-    };
+    if (recurring && recurringMonths && recurringMonths > 1) {
+      // Cria a série de receitas parceladas/temporárias
+      const seriesId = 'series-inc-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+      const itemsToCreate = [];
 
-    if (useFirestore && firestoreDb) {
-      try {
-        await firestoreDb.collection('incomes').add(newIncome);
-        showToast(`Receita "${description}" salva na nuvem!`, 'success');
-      } catch (err) {
-        console.error('Erro ao salvar no Firestore:', err);
-        showToast('Erro ao salvar na nuvem: ' + err.message, 'error');
-      }
-    } else if (state.isOnline) {
-      try {
-        const res = await fetch('/api/incomes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: 'inc-' + Date.now(), ...newIncome })
+      for (let i = 1; i <= recurringMonths; i++) {
+        const itemDate = addMonthsToDate(date, i - 1);
+        const itemDesc = `${description} (${i}/${recurringMonths})`;
+        itemsToCreate.push({
+          description: itemDesc,
+          amount,
+          category,
+          date: itemDate,
+          recurring: true,
+          installment: i,
+          totalInstallments: recurringMonths,
+          seriesId,
+          createdAt: new Date().toISOString()
         });
-        const json = await res.json();
-        if (json.success) {
-          state.incomes.unshift(json.data);
-          showToast(`Receita "${description}" adicionada!`, 'success');
-        } else {
-          throw new Error(json.error || 'Erro ao cadastrar');
+      }
+
+      if (useFirestore && firestoreDb) {
+        try {
+          const batch = firestoreDb.batch();
+          itemsToCreate.forEach(item => {
+            const docRef = firestoreDb.collection('incomes').doc();
+            batch.set(docRef, item);
+          });
+          await batch.commit();
+          showToast(`Todas as ${recurringMonths} entradas de "${description}" foram agendadas na nuvem!`, 'success');
+        } catch (err) {
+          console.error('Erro ao salvar parcelas de renda no Firestore:', err);
+          showToast('Erro ao salvar na nuvem: ' + err.message, 'error');
         }
-      } catch (err) {
-        state.incomes.unshift({ id: 'inc-' + Date.now(), ...newIncome });
+      } else {
+        itemsToCreate.forEach(item => {
+          state.incomes.unshift({ id: 'inc-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6), ...item });
+        });
         saveLocalData();
-        showToast(`Receita salva em modo local.`, 'success');
+        showToast(`Todas as ${recurringMonths} entradas de "${description}" foram agendadas!`, 'success');
+        renderAll();
       }
     } else {
-      state.incomes.unshift({ id: 'inc-' + Date.now(), ...newIncome });
-      saveLocalData();
-      showToast(`Receita "${description}" adicionada!`, 'success');
+      const newIncome = {
+        description,
+        amount,
+        category,
+        date,
+        recurring,
+        createdAt: new Date().toISOString()
+      };
+
+      if (useFirestore && firestoreDb) {
+        try {
+          await firestoreDb.collection('incomes').add(newIncome);
+          showToast(`Receita "${description}" salva na nuvem!`, 'success');
+        } catch (err) {
+          console.error('Erro ao salvar no Firestore:', err);
+          showToast('Erro ao salvar na nuvem: ' + err.message, 'error');
+        }
+      } else if (state.isOnline) {
+        try {
+          const res = await fetch('/api/incomes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: 'inc-' + Date.now(), ...newIncome })
+          });
+          const json = await res.json();
+          if (json.success) {
+            state.incomes.unshift(json.data);
+            showToast(`Receita "${description}" adicionada!`, 'success');
+          } else {
+            throw new Error(json.error || 'Erro ao cadastrar');
+          }
+        } catch (err) {
+          state.incomes.unshift({ id: 'inc-' + Date.now(), ...newIncome });
+          saveLocalData();
+          showToast(`Receita salva em modo local.`, 'success');
+        }
+      } else {
+        state.incomes.unshift({ id: 'inc-' + Date.now(), ...newIncome });
+        saveLocalData();
+        showToast(`Receita "${description}" adicionada!`, 'success');
+      }
     }
 
     elements.incomeForm.reset();
+    if (elements.incomeRecurringMonthsContainer) {
+      elements.incomeRecurringMonthsContainer.classList.add('hidden');
+    }
     setupDates();
     if (!useFirestore) {
       renderAll();
@@ -1334,59 +1439,111 @@ document.addEventListener('DOMContentLoaded', () => {
     const paymentUrl = elements.expensePaymentUrl ? elements.expensePaymentUrl.value.trim() : '';
     const paid = elements.expensePaid.checked;
     const recurring = Boolean(elements.expenseRecurring && elements.expenseRecurring.checked);
+    const recurringMonths = recurring && elements.expenseRecurringMonths && elements.expenseRecurringMonths.value.trim()
+      ? parseInt(elements.expenseRecurringMonths.value, 10)
+      : null;
 
     if (!description || isNaN(amount) || amount <= 0) {
       showToast('Preencha a descrição e um valor positivo para a conta.', 'error');
       return;
     }
 
-    const newExpense = {
-      description,
-      amount,
-      dueDate,
-      category,
-      paid,
-      recurring,
-      createdAt: new Date().toISOString()
-    };
-    if (paymentUrl) {
-      newExpense.paymentUrl = paymentUrl;
-    }
+    if (recurring && recurringMonths && recurringMonths > 1) {
+      // Cria a série de parcelas mensais
+      const seriesId = 'series-exp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+      const itemsToCreate = [];
 
-    if (useFirestore && firestoreDb) {
-      try {
-        await firestoreDb.collection('expenses').add(newExpense);
-        showToast(`Conta "${description}" salva na nuvem!`, 'success');
-      } catch (err) {
-        console.error('Erro ao salvar no Firestore:', err);
-        showToast('Erro ao salvar na nuvem: ' + err.message, 'error');
-      }
-    } else if (state.isOnline) {
-      try {
-        const res = await fetch('/api/expenses', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: 'exp-' + Date.now(), ...newExpense })
+      for (let i = 1; i <= recurringMonths; i++) {
+        const installmentDueDate = addMonthsToDate(dueDate, i - 1);
+        const installmentDesc = `${description} (${i}/${recurringMonths})`;
+        itemsToCreate.push({
+          description: installmentDesc,
+          amount,
+          dueDate: installmentDueDate,
+          category,
+          paid: i === 1 ? paid : false,
+          recurring: true,
+          installment: i,
+          totalInstallments: recurringMonths,
+          seriesId,
+          paymentUrl: paymentUrl || '',
+          createdAt: new Date().toISOString()
         });
-        const json = await res.json();
-        if (json.success) {
-          state.expenses.unshift(json.data);
-          showToast(`Conta "${description}" cadastrada!`, 'success');
-        } else {
-          throw new Error(json.error || 'Erro ao cadastrar');
+      }
+
+      if (useFirestore && firestoreDb) {
+        try {
+          const batch = firestoreDb.batch();
+          itemsToCreate.forEach(item => {
+            const docRef = firestoreDb.collection('expenses').doc();
+            batch.set(docRef, item);
+          });
+          await batch.commit();
+          showToast(`Todas as ${recurringMonths} parcelas de "${description}" foram agendadas na nuvem!`, 'success');
+        } catch (err) {
+          console.error('Erro ao salvar parcelas no Firestore:', err);
+          showToast('Erro ao salvar na nuvem: ' + err.message, 'error');
         }
-      } catch (err) {
-        state.expenses.unshift({ id: 'exp-' + Date.now(), ...newExpense });
+      } else {
+        itemsToCreate.forEach(item => {
+          state.expenses.unshift({ id: 'exp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6), ...item });
+        });
         saveLocalData();
-        showToast(`Conta salva em modo local.`, 'success');
+        showToast(`Todas as ${recurringMonths} parcelas de "${description}" foram agendadas!`, 'success');
+        renderAll();
       }
     } else {
-      state.expenses.unshift({ id: 'exp-' + Date.now(), ...newExpense });
-      saveLocalData();
-      showToast(`Conta "${description}" cadastrada!`, 'success');
+      const newExpense = {
+        description,
+        amount,
+        dueDate,
+        category,
+        paid,
+        recurring,
+        createdAt: new Date().toISOString()
+      };
+      if (paymentUrl) {
+        newExpense.paymentUrl = paymentUrl;
+      }
+
+      if (useFirestore && firestoreDb) {
+        try {
+          await firestoreDb.collection('expenses').add(newExpense);
+          showToast(`Conta "${description}" salva na nuvem!`, 'success');
+        } catch (err) {
+          console.error('Erro ao salvar no Firestore:', err);
+          showToast('Erro ao salvar na nuvem: ' + err.message, 'error');
+        }
+      } else if (state.isOnline) {
+        try {
+          const res = await fetch('/api/expenses', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: 'exp-' + Date.now(), ...newExpense })
+          });
+          const json = await res.json();
+          if (json.success) {
+            state.expenses.unshift(json.data);
+            showToast(`Conta "${description}" cadastrada!`, 'success');
+          } else {
+            throw new Error(json.error || 'Erro ao cadastrar');
+          }
+        } catch (err) {
+          state.expenses.unshift({ id: 'exp-' + Date.now(), ...newExpense });
+          saveLocalData();
+          showToast(`Conta salva em modo local.`, 'success');
+        }
+      } else {
+        state.expenses.unshift({ id: 'exp-' + Date.now(), ...newExpense });
+        saveLocalData();
+        showToast(`Conta "${description}" cadastrada!`, 'success');
+      }
     }
 
     elements.expenseForm.reset();
+    if (elements.expenseRecurringMonthsContainer) {
+      elements.expenseRecurringMonthsContainer.classList.add('hidden');
+    }
     setupDates();
     if (!useFirestore) {
       renderAll();
@@ -1816,6 +1973,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elements.editExpenseRecurring) {
       elements.editExpenseRecurring.checked = Boolean(expense.recurring);
     }
+    if (elements.editExpenseRecurringMonthsContainer && elements.editExpenseRecurringMonths) {
+      if (expense.recurring && expense.totalInstallments) {
+        elements.editExpenseRecurringMonths.value = expense.totalInstallments;
+        elements.editExpenseRecurringMonthsContainer.classList.remove('hidden');
+      } else {
+        elements.editExpenseRecurringMonths.value = '';
+        elements.editExpenseRecurringMonthsContainer.classList.toggle('hidden', !expense.recurring);
+      }
+    }
 
     elements.editExpenseModal.classList.remove('hidden');
     elements.editExpenseModal.classList.add('flex');
@@ -1826,6 +1992,15 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.editExpenseModal.classList.add('hidden');
     elements.editExpenseModal.classList.remove('flex');
   };
+
+  if (elements.editExpenseRecurring && elements.editExpenseRecurringMonthsContainer) {
+    elements.editExpenseRecurring.addEventListener('change', () => {
+      elements.editExpenseRecurringMonthsContainer.classList.toggle('hidden', !elements.editExpenseRecurring.checked);
+      if (!elements.editExpenseRecurring.checked && elements.editExpenseRecurringMonths) {
+        elements.editExpenseRecurringMonths.value = '';
+      }
+    });
+  }
 
   if (elements.closeEditModalBtn) {
     elements.closeEditModalBtn.addEventListener('click', closeEditExpenseModal);
@@ -1853,6 +2028,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const paymentUrl = elements.editExpensePaymentUrl ? elements.editExpensePaymentUrl.value.trim() : '';
       const paid = elements.editExpensePaid.checked;
       const recurring = Boolean(elements.editExpenseRecurring && elements.editExpenseRecurring.checked);
+      const recurringMonths = recurring && elements.editExpenseRecurringMonths && elements.editExpenseRecurringMonths.value.trim()
+        ? parseInt(elements.editExpenseRecurringMonths.value, 10)
+        : null;
 
       if (!description || isNaN(amount) || amount <= 0) {
         showToast('Preencha a descrição e um valor positivo válido.', 'error');
@@ -1869,6 +2047,9 @@ document.addEventListener('DOMContentLoaded', () => {
         recurring,
         updatedAt: new Date().toISOString()
       };
+      if (recurringMonths) {
+        updateData.totalInstallments = recurringMonths;
+      }
 
       if (useFirestore && firestoreDb) {
         try {
