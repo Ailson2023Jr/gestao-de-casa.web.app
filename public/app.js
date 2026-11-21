@@ -71,6 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
     pendingDelete: null, // { type: 'income' | 'expense', id: string, name: string }
     chartInstance: null,
     monthlyChartInstance: null,
+    doughnutChartInstance: null,
+    doughnutMode: 'categories',
     currentChartTab: 'overview'
   };
 
@@ -93,11 +95,20 @@ document.addEventListener('DOMContentLoaded', () => {
     chartModalBalance: document.getElementById('chartModalBalance'),
     chartModalBalancePercent: document.getElementById('chartModalBalancePercent'),
     tabOverviewBtn: document.getElementById('tabOverviewBtn'),
+    tabDoughnutBtn: document.getElementById('tabDoughnutBtn'),
     tabCategoriesBtn: document.getElementById('tabCategoriesBtn'),
     tabMonthlyBtn: document.getElementById('tabMonthlyBtn'),
     chartViewOverview: document.getElementById('chartViewOverview'),
+    chartViewDoughnut: document.getElementById('chartViewDoughnut'),
     chartViewCategories: document.getElementById('chartViewCategories'),
     chartViewMonthly: document.getElementById('chartViewMonthly'),
+    doughnutChartCanvas: document.getElementById('doughnutChartCanvas'),
+    doughnutModeCategoriesBtn: document.getElementById('doughnutModeCategoriesBtn'),
+    doughnutModeProportionBtn: document.getElementById('doughnutModeProportionBtn'),
+    doughnutCenterLabel: document.getElementById('doughnutCenterLabel'),
+    doughnutCenterValue: document.getElementById('doughnutCenterValue'),
+    doughnutCenterSub: document.getElementById('doughnutCenterSub'),
+    doughnutLegendContainer: document.getElementById('doughnutLegendContainer'),
     categoryBarsContainer: document.getElementById('categoryBarsContainer'),
     chartModalFooterNote: document.getElementById('chartModalFooterNote'),
     mainBarChartCanvas: document.getElementById('mainBarChartCanvas'),
@@ -2128,9 +2139,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const c2 = Chart.getChart(elements.monthlyBarChartCanvas);
         if (c2) c2.destroy();
       }
+      if (elements.doughnutChartCanvas) {
+        const c3 = Chart.getChart(elements.doughnutChartCanvas);
+        if (c3) c3.destroy();
+      }
     }
     state.chartInstance = null;
     state.monthlyChartInstance = null;
+    state.doughnutChartInstance = null;
   };
 
   const updateChartModalContent = () => {
@@ -2163,14 +2179,16 @@ document.addEventListener('DOMContentLoaded', () => {
       elements.chartModalFooterNote.innerHTML = `Suas contas comprometem <strong>${expensePercent.toFixed(1)}%</strong> da receita. Restam <strong>${formatMoney(balance)}</strong> livres.`;
     }
 
-    // 1. Renderiza o Gráfico Canvas (Chart.js)
-    renderMainChartCanvas(totalIncome, totalExpense, balance, expensePercent, balancePercent);
-
-    // 2. Renderiza as Barras Detalhadas por Categoria
-    renderCategoryBars(totalIncome);
-
-    // 3. Renderiza o Comparativo Mensal (Evolução Mês a Mês)
-    renderMonthlyComparison();
+    // Renderiza a visualização correspondente à aba ativa
+    if (state.currentChartTab === 'overview') {
+      renderMainChartCanvas(totalIncome, totalExpense, balance, expensePercent, balancePercent);
+    } else if (state.currentChartTab === 'doughnut') {
+      renderDoughnutChart(totalIncome, totalExpense, balance, expensePercent, balancePercent);
+    } else if (state.currentChartTab === 'categories') {
+      renderCategoryBars(totalIncome);
+    } else if (state.currentChartTab === 'monthly') {
+      renderMonthlyComparison();
+    }
   };
 
   const renderMainChartCanvas = (totalIncome, totalExpense, balance, expensePercent, balancePercent) => {
@@ -2276,9 +2294,7 @@ document.addEventListener('DOMContentLoaded', () => {
           responsive: true,
           maintainAspectRatio: false,
           devicePixelRatio: window.devicePixelRatio || 1,
-          animation: {
-            duration: 400
-          },
+          animation: false,
           layout: {
             padding: {
               top: 32,
@@ -2348,6 +2364,256 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     }
+  };
+
+  // ==========================================
+  // GRÁFICO DE ROSCA INTERATIVO (DOUGHNUT)
+  // ==========================================
+  const renderDoughnutChart = (totalIncome, totalExpense, balance, expensePercent, balancePercent) => {
+    if (!elements.doughnutChartCanvas) return;
+
+    if (typeof Chart !== 'undefined') {
+      const existing = Chart.getChart(elements.doughnutChartCanvas);
+      if (existing) existing.destroy();
+    }
+    if (state.doughnutChartInstance) {
+      state.doughnutChartInstance.destroy();
+      state.doughnutChartInstance = null;
+    }
+
+    elements.doughnutChartCanvas.removeAttribute('width');
+    elements.doughnutChartCanvas.removeAttribute('height');
+    elements.doughnutChartCanvas.style.width = '100%';
+    elements.doughnutChartCanvas.style.height = '100%';
+
+    const ctx = elements.doughnutChartCanvas.getContext('2d');
+    if (typeof Chart === 'undefined') return;
+
+    const catColorMap = {
+      'Moradia': { bg: 'rgba(99, 102, 241, 0.85)', border: '#6366f1', text: 'text-indigo-400' },
+      'Serviços': { bg: 'rgba(6, 182, 212, 0.85)', border: '#06b6d4', text: 'text-cyan-400' },
+      'Alimentação': { bg: 'rgba(245, 158, 11, 0.85)', border: '#f59e0b', text: 'text-amber-400' },
+      'Cartão': { bg: 'rgba(244, 63, 94, 0.85)', border: '#f43f5e', text: 'text-rose-400' },
+      'Transporte': { bg: 'rgba(168, 85, 247, 0.85)', border: '#a855f7', text: 'text-purple-400' },
+      'Saúde': { bg: 'rgba(16, 185, 129, 0.85)', border: '#10b981', text: 'text-emerald-400' },
+      'Lazer': { bg: 'rgba(236, 72, 153, 0.85)', border: '#ec4899', text: 'text-pink-400' },
+      'Investimentos / Reserva': { bg: 'rgba(139, 92, 246, 0.85)', border: '#8b5cf6', text: 'text-purple-300' },
+      'Outros': { bg: 'rgba(148, 163, 184, 0.85)', border: '#94a3b8', text: 'text-slate-300' }
+    };
+
+    let chartLabels = [];
+    let chartData = [];
+    let chartBgColors = [];
+    let chartBorderColors = [];
+
+    if (state.doughnutMode === 'categories') {
+      // Agrupa despesas por categoria
+      const categoryTotals = {};
+      state.expenses.forEach(exp => {
+        const cat = exp.category || 'Outros';
+        categoryTotals[cat] = (categoryTotals[cat] || 0) + (Number(exp.amount) || 0);
+      });
+
+      const sortedCategories = Object.keys(categoryTotals)
+        .map(cat => ({
+          name: cat,
+          amount: categoryTotals[cat],
+          percentOfExpenses: totalExpense > 0 ? (categoryTotals[cat] / totalExpense) * 100 : 0,
+          percentOfIncome: totalIncome > 0 ? (categoryTotals[cat] / totalIncome) * 100 : 0
+        }))
+        .filter(c => c.amount > 0)
+        .sort((a, b) => b.amount - a.amount);
+
+      if (sortedCategories.length === 0) {
+        chartLabels = ['Nenhum débito'];
+        chartData = [1];
+        chartBgColors = ['rgba(71, 85, 105, 0.25)'];
+        chartBorderColors = ['#475569'];
+      } else {
+        sortedCategories.forEach(c => {
+          const cfg = catColorMap[c.name] || catColorMap['Outros'];
+          chartLabels.push(c.name);
+          chartData.push(c.amount);
+          chartBgColors.push(cfg.bg);
+          chartBorderColors.push(cfg.border);
+        });
+      }
+
+      // Atualiza texto central informativo
+      if (elements.doughnutCenterLabel) elements.doughnutCenterLabel.textContent = 'Total Débitos';
+      if (elements.doughnutCenterValue) {
+        elements.doughnutCenterValue.textContent = formatMoney(totalExpense);
+        elements.doughnutCenterValue.className = 'text-lg sm:text-2xl font-black text-rose-400 tracking-tight';
+      }
+      if (elements.doughnutCenterSub) {
+        elements.doughnutCenterSub.textContent = `${expensePercent.toFixed(1)}% da renda`;
+      }
+
+      // Atualiza lista de cards de legenda detalhada
+      if (elements.doughnutLegendContainer) {
+        elements.doughnutLegendContainer.innerHTML = '';
+        if (sortedCategories.length === 0) {
+          elements.doughnutLegendContainer.innerHTML = `
+            <div class="py-8 text-center text-slate-500 text-xs">
+              Nenhuma conta cadastrada para exibir o gráfico de rosca.
+            </div>
+          `;
+        } else {
+          sortedCategories.forEach(item => {
+            const colors = catColorMap[item.name] || catColorMap['Outros'];
+            const card = document.createElement('div');
+            card.className = 'p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between hover:border-slate-700 transition-colors';
+            card.innerHTML = `
+              <div class="flex items-center gap-2.5">
+                <span class="w-3.5 h-3.5 rounded-full flex-shrink-0" style="background-color: ${colors.border}; box-shadow: 0 0 10px ${colors.bg};"></span>
+                <div>
+                  <span class="text-xs font-bold text-slate-200 block">${item.name}</span>
+                  <span class="text-[11px] text-slate-400 font-medium">${formatMoney(item.amount)}</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-xs font-black ${colors.text} block">${item.percentOfExpenses.toFixed(1)}%</span>
+                <span class="text-[10px] text-slate-500">${item.percentOfIncome.toFixed(1)}% da renda</span>
+              </div>
+            `;
+            elements.doughnutLegendContainer.appendChild(card);
+          });
+        }
+      }
+
+    } else {
+      // Modo: Proporção Débitos vs Saldo Livre
+      if (balance >= 0) {
+        chartLabels = ['Débitos Totais', 'Saldo Livre'];
+        chartData = [Math.max(totalExpense, 0), Math.max(balance, 0)];
+        chartBgColors = ['rgba(244, 63, 94, 0.85)', 'rgba(59, 130, 246, 0.85)'];
+        chartBorderColors = ['#f43f5e', '#3b82f6'];
+
+        if (elements.doughnutCenterLabel) elements.doughnutCenterLabel.textContent = 'Comprometimento';
+        if (elements.doughnutCenterValue) {
+          elements.doughnutCenterValue.textContent = `${expensePercent.toFixed(1)}%`;
+          elements.doughnutCenterValue.className = 'text-lg sm:text-2xl font-black text-rose-400 tracking-tight';
+        }
+        if (elements.doughnutCenterSub) {
+          elements.doughnutCenterSub.textContent = `Restam ${formatMoney(balance)} livres`;
+        }
+      } else {
+        // Estourado
+        chartLabels = ['Receita Total', 'Déficit (Estouro)'];
+        chartData = [Math.max(totalIncome, 0), Math.abs(balance)];
+        chartBgColors = ['rgba(244, 63, 94, 0.85)', 'rgba(225, 29, 72, 1)'];
+        chartBorderColors = ['#f43f5e', '#e11d48'];
+
+        if (elements.doughnutCenterLabel) elements.doughnutCenterLabel.textContent = 'Estourado em';
+        if (elements.doughnutCenterValue) {
+          elements.doughnutCenterValue.textContent = `${expensePercent.toFixed(1)}%`;
+          elements.doughnutCenterValue.className = 'text-lg sm:text-2xl font-black text-rose-500 tracking-tight';
+        }
+        if (elements.doughnutCenterSub) {
+          elements.doughnutCenterSub.textContent = `Déficit de ${formatMoney(Math.abs(balance))}`;
+        }
+      }
+
+      // Atualiza lista de cards de legenda para proporção
+      if (elements.doughnutLegendContainer) {
+        elements.doughnutLegendContainer.innerHTML = `
+          <div class="space-y-2.5">
+            <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <span class="w-3.5 h-3.5 rounded-full bg-rose-500 flex-shrink-0" style="box-shadow: 0 0 10px rgba(244, 63, 94, 0.5);"></span>
+                <div>
+                  <span class="text-xs font-bold text-slate-200 block">Débitos Totais</span>
+                  <span class="text-[11px] text-slate-400 font-medium">${formatMoney(totalExpense)}</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-xs font-black text-rose-400 block">${expensePercent.toFixed(1)}%</span>
+                <span class="text-[10px] text-slate-500">da renda total</span>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <span class="w-3.5 h-3.5 rounded-full ${balance >= 0 ? 'bg-blue-500' : 'bg-rose-700'} flex-shrink-0" style="box-shadow: 0 0 10px ${balance >= 0 ? 'rgba(59, 130, 246, 0.5)' : 'rgba(225, 29, 72, 0.5)'};"></span>
+                <div>
+                  <span class="text-xs font-bold text-slate-200 block">${balance >= 0 ? 'Saldo Livre' : 'Déficit (Negativo)'}</span>
+                  <span class="text-[11px] text-slate-400 font-medium">${formatMoney(Math.abs(balance))}</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-xs font-black ${balance >= 0 ? 'text-blue-400' : 'text-rose-500'} block">${Math.max(balancePercent, 0).toFixed(1)}%</span>
+                <span class="text-[10px] text-slate-500">${balance >= 0 ? 'sobra limpa' : 'excedente'}</span>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 flex-shrink-0" style="box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);"></span>
+                <div>
+                  <span class="text-xs font-bold text-slate-200 block">Receita Total Base</span>
+                  <span class="text-[11px] text-slate-400 font-medium">${formatMoney(totalIncome)}</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-xs font-black text-emerald-400 block">100.0%</span>
+                <span class="text-[10px] text-slate-500">referência</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    state.doughnutChartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: chartLabels,
+        datasets: [{
+          data: chartData,
+          backgroundColor: chartBgColors,
+          borderColor: '#0f172a',
+          borderWidth: 3,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        devicePixelRatio: window.devicePixelRatio || 1,
+        animation: false,
+        cutout: '72%',
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            titleColor: '#f8fafc',
+            bodyColor: '#cbd5e1',
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderWidth: 1,
+            padding: 12,
+            cornerRadius: 12,
+            callbacks: {
+              label: function(context) {
+                const val = context.raw || 0;
+                if (state.doughnutMode === 'categories') {
+                  const pct = totalExpense > 0 ? ((val / totalExpense) * 100).toFixed(1) : '0.0';
+                  const pctOfIncome = totalIncome > 0 ? ((val / totalIncome) * 100).toFixed(1) : '0.0';
+                  return [
+                    `Valor: ${formatMoney(val)}`,
+                    `Fatia dos débitos: ${pct}%`,
+                    `Impacto na renda: ${pctOfIncome}%`
+                  ];
+                } else {
+                  return ` Valor: ${formatMoney(val)}`;
+                }
+              }
+            }
+          }
+        }
+      }
+    });
   };
 
   const renderCategoryBars = (totalIncome) => {
@@ -2569,9 +2835,7 @@ document.addEventListener('DOMContentLoaded', () => {
             responsive: true,
             maintainAspectRatio: false,
             devicePixelRatio: window.devicePixelRatio || 1,
-            animation: {
-              duration: 400
-            },
+            animation: false,
             plugins: {
               legend: {
                 display: true,
@@ -2715,6 +2979,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  // Modo de exibição da Rosca (Categorias vs Proporção)
+  const setDoughnutMode = (mode) => {
+    state.doughnutMode = mode;
+    const activeClass = 'px-3 py-1.5 rounded-lg font-semibold bg-indigo-600 text-white shadow-sm transition-colors text-xs';
+    const inactiveClass = 'px-3 py-1.5 rounded-lg font-semibold text-slate-400 hover:text-white transition-colors text-xs';
+
+    if (elements.doughnutModeCategoriesBtn) {
+      elements.doughnutModeCategoriesBtn.className = mode === 'categories' ? activeClass : inactiveClass;
+    }
+    if (elements.doughnutModeProportionBtn) {
+      elements.doughnutModeProportionBtn.className = mode === 'proportion' ? activeClass : inactiveClass;
+    }
+
+    const totalIncome = state.incomes.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    const totalExpense = state.expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    const balance = totalIncome - totalExpense;
+    const expensePercent = totalIncome > 0 ? (totalExpense / totalIncome) * 100 : (totalExpense > 0 ? 100 : 0);
+    const balancePercent = totalIncome > 0 ? (balance / totalIncome) * 100 : 0;
+
+    renderDoughnutChart(totalIncome, totalExpense, balance, expensePercent, balancePercent);
+  };
+
   // Alternância de Abas dentro do Modal de Gráfico
   const switchChartTab = (tabName) => {
     state.currentChartTab = tabName;
@@ -2723,17 +3009,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const inactiveClass = 'px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors text-slate-400 hover:text-white hover:bg-slate-800';
 
     if (elements.tabOverviewBtn) elements.tabOverviewBtn.className = tabName === 'overview' ? activeClass : inactiveClass;
+    if (elements.tabDoughnutBtn) elements.tabDoughnutBtn.className = tabName === 'doughnut' ? activeClass : inactiveClass;
     if (elements.tabCategoriesBtn) elements.tabCategoriesBtn.className = tabName === 'categories' ? activeClass : inactiveClass;
     if (elements.tabMonthlyBtn) elements.tabMonthlyBtn.className = tabName === 'monthly' ? activeClass : inactiveClass;
 
     if (elements.chartViewOverview) elements.chartViewOverview.classList.toggle('hidden', tabName !== 'overview');
+    if (elements.chartViewDoughnut) elements.chartViewDoughnut.classList.toggle('hidden', tabName !== 'doughnut');
     if (elements.chartViewCategories) elements.chartViewCategories.classList.toggle('hidden', tabName !== 'categories');
     if (elements.chartViewMonthly) elements.chartViewMonthly.classList.toggle('hidden', tabName !== 'monthly');
 
+    const totalIncome = state.incomes.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    const totalExpense = state.expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    const balance = totalIncome - totalExpense;
+    const expensePercent = totalIncome > 0 ? (totalExpense / totalIncome) * 100 : (totalExpense > 0 ? 100 : 0);
+    const balancePercent = totalIncome > 0 ? (balance / totalIncome) * 100 : 0;
+
     if (tabName === 'overview') {
       requestAnimationFrame(() => {
-        setTimeout(() => updateChartModalContent(), 40);
+        setTimeout(() => renderMainChartCanvas(totalIncome, totalExpense, balance, expensePercent, balancePercent), 40);
       });
+    } else if (tabName === 'doughnut') {
+      requestAnimationFrame(() => {
+        setTimeout(() => renderDoughnutChart(totalIncome, totalExpense, balance, expensePercent, balancePercent), 40);
+      });
+    } else if (tabName === 'categories') {
+      renderCategoryBars(totalIncome);
     } else if (tabName === 'monthly') {
       requestAnimationFrame(() => {
         setTimeout(() => renderMonthlyComparison(), 40);
@@ -2758,11 +3058,22 @@ document.addEventListener('DOMContentLoaded', () => {
   if (elements.tabOverviewBtn) {
     elements.tabOverviewBtn.addEventListener('click', () => switchChartTab('overview'));
   }
+  if (elements.tabDoughnutBtn) {
+    elements.tabDoughnutBtn.addEventListener('click', () => switchChartTab('doughnut'));
+  }
   if (elements.tabCategoriesBtn) {
     elements.tabCategoriesBtn.addEventListener('click', () => switchChartTab('categories'));
   }
   if (elements.tabMonthlyBtn) {
     elements.tabMonthlyBtn.addEventListener('click', () => switchChartTab('monthly'));
+  }
+
+  // Cliques nos modos do Gráfico de Rosca
+  if (elements.doughnutModeCategoriesBtn) {
+    elements.doughnutModeCategoriesBtn.addEventListener('click', () => setDoughnutMode('categories'));
+  }
+  if (elements.doughnutModeProportionBtn) {
+    elements.doughnutModeProportionBtn.addEventListener('click', () => setDoughnutMode('proportion'));
   }
 
   // ==========================================

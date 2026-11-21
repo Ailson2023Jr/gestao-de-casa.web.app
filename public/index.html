@@ -773,6 +773,9 @@
         <button id="tabOverviewBtn" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors bg-indigo-600 text-white shadow-md">
           📊 Comparativo Geral (Receita vs Débitos)
         </button>
+        <button id="tabDoughnutBtn" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors text-slate-400 hover:text-white hover:bg-slate-800 flex items-center gap-1.5">
+          <span>🍩 Gráfico de Rosca</span>
+        </button>
         <button id="tabCategoriesBtn" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors text-slate-400 hover:text-white hover:bg-slate-800">
           🏷️ Débitos por Categoria (% da Renda)
         </button>
@@ -785,6 +788,48 @@
       <div id="chartViewOverview" class="space-y-4">
         <div class="h-72 sm:h-80 w-full relative" style="min-height: 300px;">
           <canvas id="mainBarChartCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- VISÃO 4: GRÁFICO DE ROSCA INTERATIVO (DOUGHNUT CHART) -->
+      <div id="chartViewDoughnut" class="space-y-4 hidden">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h4 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+              <span>🍩 Distribuição Proporcional</span>
+            </h4>
+            <p class="text-xs text-slate-400">
+              Visualização de fatias para identificar onde o orçamento está sendo concentrado
+            </p>
+          </div>
+          <div class="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800 self-start sm:self-auto text-xs">
+            <button id="doughnutModeCategoriesBtn" class="px-3 py-1.5 rounded-lg font-semibold bg-indigo-600 text-white shadow-sm transition-colors text-xs">
+              🏷️ Por Categoria
+            </button>
+            <button id="doughnutModeProportionBtn" class="px-3 py-1.5 rounded-lg font-semibold text-slate-400 hover:text-white transition-colors text-xs">
+              ⚖️ Débitos vs Saldo Livre
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center pt-2">
+          <!-- Canvas da Rosca com Centro Informativo -->
+          <div class="md:col-span-5 flex flex-col items-center justify-center relative">
+            <div class="w-64 h-64 sm:w-72 sm:h-72 relative flex items-center justify-center">
+              <canvas id="doughnutChartCanvas"></canvas>
+              <!-- Centro Informativo da Rosca -->
+              <div id="doughnutCenterText" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4">
+                <span class="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider" id="doughnutCenterLabel">Total Débitos</span>
+                <span class="text-lg sm:text-2xl font-black text-rose-400 tracking-tight" id="doughnutCenterValue">R$ 0,00</span>
+                <span class="text-[11px] sm:text-xs font-bold text-slate-300 mt-0.5" id="doughnutCenterSub">0% da renda</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Legenda Detalhada em Cards com Fatias -->
+          <div class="md:col-span-7 space-y-2 max-h-80 overflow-y-auto pr-1" id="doughnutLegendContainer">
+            <!-- Gerado dinamicamente via JS -->
+          </div>
         </div>
       </div>
 
@@ -1328,7 +1373,7 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.7"></script>
 </body>
 </html>
 
