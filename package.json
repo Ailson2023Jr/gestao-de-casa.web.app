@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "bot": "node bot/index.js"
   },
   "keywords": [
     "financas",
@@ -17,6 +18,11 @@
   "author": "Junior",
   "license": "MIT",
   "dependencies": {
-    "firebase": "^13.1.0"
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "firebase": "^13.1.0",
+    "node-cron": "^4.6.0",
+    "pino": "^10.4.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0"
   }
 }

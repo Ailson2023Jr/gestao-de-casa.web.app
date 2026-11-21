@@ -10,6 +10,11 @@ firestore-debug.log*
 .env
 .env.local
 
+# WhatsApp Bot Sessões e QR Codes
+bot/auth_info/
+bot/qr.png
+bot/qr.html
+
 # Arquivos de sistema
 Thumbs.db
 Desktop.ini
