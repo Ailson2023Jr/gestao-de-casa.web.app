@@ -2108,16 +2108,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const openChartModal = () => {
     elements.chartModal.classList.remove('hidden');
     elements.chartModal.classList.add('flex');
-    updateChartModalContent();
+    // Aguarda o frame do navegador calcular o layout para garantir dimensões perfeitas do canvas
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        updateChartModalContent();
+      }, 50);
+    });
   };
 
   const closeChartModal = () => {
     elements.chartModal.classList.add('hidden');
     elements.chartModal.classList.remove('flex');
-    if (state.monthlyChartInstance) {
-      state.monthlyChartInstance.destroy();
-      state.monthlyChartInstance = null;
+    if (typeof Chart !== 'undefined') {
+      if (elements.mainBarChartCanvas) {
+        const c1 = Chart.getChart(elements.mainBarChartCanvas);
+        if (c1) c1.destroy();
+      }
+      if (elements.monthlyBarChartCanvas) {
+        const c2 = Chart.getChart(elements.monthlyBarChartCanvas);
+        if (c2) c2.destroy();
+      }
     }
+    state.chartInstance = null;
+    state.monthlyChartInstance = null;
   };
 
   const updateChartModalContent = () => {
@@ -2162,23 +2175,78 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const renderMainChartCanvas = (totalIncome, totalExpense, balance, expensePercent, balancePercent) => {
     if (!elements.mainBarChartCanvas) return;
-    const ctx = elements.mainBarChartCanvas.getContext('2d');
 
-    // Destrói gráfico anterior se existir
+    // 1. Destrói com segurança qualquer instância anterior no elemento canvas
+    if (typeof Chart !== 'undefined') {
+      const existingChart = Chart.getChart(elements.mainBarChartCanvas);
+      if (existingChart) {
+        existingChart.destroy();
+      }
+    }
     if (state.chartInstance) {
       state.chartInstance.destroy();
       state.chartInstance = null;
     }
 
+    // 2. Remove atributos de pixel rígidos injetados anteriormente para evitar distorção de escala DPI
+    elements.mainBarChartCanvas.removeAttribute('width');
+    elements.mainBarChartCanvas.removeAttribute('height');
+    elements.mainBarChartCanvas.style.width = '100%';
+    elements.mainBarChartCanvas.style.height = '100%';
+
+    const ctx = elements.mainBarChartCanvas.getContext('2d');
+
     // Se Chart.js estiver disponível
     if (typeof Chart !== 'undefined') {
       const labels = ['Receita Total', 'Débitos Totais', 'Saldo Livre'];
-      const dataValues = [totalIncome, totalExpense, Math.max(balance, 0)];
+      const dataValues = [
+        Number(totalIncome) || 0,
+        Number(totalExpense) || 0,
+        Math.max(Number(balance) || 0, 0)
+      ];
       const percentages = [
         100,
         expensePercent.toFixed(1),
         Math.max(balancePercent, 0).toFixed(1)
       ];
+
+      // Cálculo de teto sugerido para o eixo Y com margem para exibir os rótulos acima das barras
+      const maxDataVal = Math.max(...dataValues, 100);
+      const suggestedMax = Math.ceil((maxDataVal * 1.25) / 1000) * 1000;
+
+      // Plugin personalizado para exibir valores e porcentagens nítidos acima de cada barra
+      const barLabelsPlugin = {
+        id: 'barLabelsPlugin',
+        afterDatasetsDraw(chart) {
+          const { ctx: chartCtx } = chart;
+          chart.data.datasets.forEach((dataset, i) => {
+            const meta = chart.getDatasetMeta(i);
+            meta.data.forEach((bar, index) => {
+              const val = dataset.data[index];
+              if (val === undefined || val === null) return;
+              const pct = percentages[index];
+              const valStr = formatMoney(val);
+              const pctStr = index === 0 ? '100% da Renda' : index === 1 ? `${pct}% da Renda` : `${pct}% Livre`;
+
+              chartCtx.save();
+              chartCtx.textAlign = 'center';
+              chartCtx.textBaseline = 'bottom';
+
+              // 1. Rótulo da porcentagem (linha superior)
+              chartCtx.font = '600 11px "Plus Jakarta Sans", sans-serif';
+              chartCtx.fillStyle = index === 0 ? '#34d399' : index === 1 ? '#fb7185' : '#60a5fa';
+              chartCtx.fillText(pctStr, bar.x, bar.y - 18);
+
+              // 2. Valor monetário em negrito (linha inferior, logo acima da barra)
+              chartCtx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
+              chartCtx.fillStyle = '#f8fafc';
+              chartCtx.fillText(valStr, bar.x, bar.y - 4);
+
+              chartCtx.restore();
+            });
+          });
+        }
+      };
 
       state.chartInstance = new Chart(ctx, {
         type: 'bar',
@@ -2199,15 +2267,23 @@ document.addEventListener('DOMContentLoaded', () => {
             ],
             borderWidth: 2,
             borderRadius: 12,
-            barThickness: 48,
-            maxBarThickness: 64
+            barThickness: 56,
+            maxBarThickness: 72
           }]
         },
+        plugins: [barLabelsPlugin],
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          devicePixelRatio: window.devicePixelRatio || 1,
           animation: {
-            duration: 600
+            duration: 400
+          },
+          layout: {
+            padding: {
+              top: 32,
+              bottom: 8
+            }
           },
           plugins: {
             legend: {
@@ -2244,19 +2320,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 color: '#94a3b8',
                 font: {
                   family: 'Plus Jakarta Sans, sans-serif',
-                  size: 12,
-                  weight: '600'
+                  size: 13,
+                  weight: '700'
                 }
               }
             },
             y: {
               beginAtZero: true,
+              suggestedMax: suggestedMax,
               grid: {
                 color: 'rgba(255, 255, 255, 0.06)',
                 drawBorder: false
               },
               ticks: {
                 color: '#64748b',
+                font: {
+                  family: 'Plus Jakarta Sans, sans-serif',
+                  size: 11,
+                  weight: '500'
+                },
                 callback: function(value) {
                   return 'R$ ' + value.toLocaleString('pt-BR');
                 }
@@ -2305,6 +2387,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'Transporte': { bar: 'bg-purple-500', text: 'text-purple-400', badge: 'bg-purple-500/10 border-purple-500/20' },
       'Saúde': { bar: 'bg-emerald-500', text: 'text-emerald-400', badge: 'bg-emerald-500/10 border-emerald-500/20' },
       'Lazer': { bar: 'bg-pink-500', text: 'text-pink-400', badge: 'bg-pink-500/10 border-pink-500/20' },
+      'Investimentos / Reserva': { bar: 'bg-purple-500', text: 'text-purple-300', badge: 'bg-purple-500/10 border-purple-500/20' },
       'Outros': { bar: 'bg-slate-400', text: 'text-slate-300', badge: 'bg-slate-500/10 border-slate-500/20' }
     };
 
@@ -2432,12 +2515,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Renderiza o Gráfico de Barras Agrupadas por Mês (Chart.js)
     if (elements.monthlyBarChartCanvas) {
-      const ctx = elements.monthlyBarChartCanvas.getContext('2d');
-
+      if (typeof Chart !== 'undefined') {
+        const existingMonthly = Chart.getChart(elements.monthlyBarChartCanvas);
+        if (existingMonthly) {
+          existingMonthly.destroy();
+        }
+      }
       if (state.monthlyChartInstance) {
         state.monthlyChartInstance.destroy();
         state.monthlyChartInstance = null;
       }
+
+      elements.monthlyBarChartCanvas.removeAttribute('width');
+      elements.monthlyBarChartCanvas.removeAttribute('height');
+      elements.monthlyBarChartCanvas.style.width = '100%';
+      elements.monthlyBarChartCanvas.style.height = '100%';
+
+      const ctx = elements.monthlyBarChartCanvas.getContext('2d');
 
       if (typeof Chart !== 'undefined') {
         const labels = monthlyStats.map(m => m.label);
@@ -2474,8 +2568,9 @@ document.addEventListener('DOMContentLoaded', () => {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            devicePixelRatio: window.devicePixelRatio || 1,
             animation: {
-              duration: 500
+              duration: 400
             },
             plugins: {
               legend: {
@@ -2635,8 +2730,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elements.chartViewCategories) elements.chartViewCategories.classList.toggle('hidden', tabName !== 'categories');
     if (elements.chartViewMonthly) elements.chartViewMonthly.classList.toggle('hidden', tabName !== 'monthly');
 
-    if (tabName === 'monthly') {
-      renderMonthlyComparison();
+    if (tabName === 'overview') {
+      requestAnimationFrame(() => {
+        setTimeout(() => updateChartModalContent(), 40);
+      });
+    } else if (tabName === 'monthly') {
+      requestAnimationFrame(() => {
+        setTimeout(() => renderMonthlyComparison(), 40);
+      });
     }
   };
 
