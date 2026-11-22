@@ -310,17 +310,30 @@ async function startBot() {
             break;
           }
 
-          // 6. AJUDA / MENU
+          // 6. ENVIAR LINK DO SISTEMA
+          case 'link': {
+            let reply = `${botPrefix}🌐 *Painel do Gestão de Casa:*\n\n`;
+            reply += `👉 Acesse pelo link:\nhttps://gestao-de-casa.web.app/\n\n`;
+            reply += `💡 *Dica:* Salve nos favoritos do navegador do seu celular para acesso rápido! 📱`;
+            await sock.sendMessage(remoteJid, { text: reply });
+            break;
+          }
+
+          // 7. AJUDA / MENU
           case 'help': {
             let reply = `${botPrefix}👋 *Olá, ${senderName}! Sou o Assistente do Gestão de Casa.* 🤖\n\n`;
             reply += `Vocês podem interagir comigo enviando frases naturais aqui no grupo:\n\n`;
             reply += `👉 *Dar baixa em conta paga:*\n`;
             reply += `  _"paguei a luz"_\n`;
             reply += `  _"condomínio pago"_\n\n`;
-            reply += `👉 *Cadastrar nova despesa:*\n`;
+            reply += `👉 *Cadastrar nova receita:*\n`;
+            reply += `  _"receita décimo terceiro 2400"_\n`;
+            reply += `  _"adicionar receita freela 500"_\n\n`;
+            reply += `👉 *Cadastrar nova conta/despesa:*\n`;
             reply += `  _"conta internet 120 dia 28"_\n`;
             reply += `  _"nova conta mercado 450 hoje"_\n\n`;
             reply += `👉 *Consultas rápidas:*\n`;
+            reply += `  _"link"_ ➔ Envia o link de acesso ao sistema web\n`;
             reply += `  _"contas"_ ➔ Lista as próximas contas a vencer\n`;
             reply += `  _"saldo"_ ➔ Exibe o resumo de receitas, gastos e saldo livre\n\n`;
             reply += `Todo dia de manhã também envio o alerta automático das contas que vencem no dia ou no dia seguinte! 🔔`;

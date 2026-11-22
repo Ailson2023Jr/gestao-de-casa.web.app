@@ -137,6 +137,11 @@ function parseMessage(rawText) {
     return { type: 'help' };
   }
 
+  // 1.1 INTENÇÃO: ENVIAR LINK DO SISTEMA
+  if (['link', 'site', 'painel', 'sistema', 'app', 'web', 'url'].includes(norm) || norm === 'mandar o link' || norm === 'manda o link') {
+    return { type: 'link' };
+  }
+
   // 2. INTENÇÃO: CONSULTAR SALDO OU RESUMO
   if (['saldo', 'resumo', 'como estamos', 'status', 'relatorio'].includes(norm)) {
     return { type: 'summary' };
