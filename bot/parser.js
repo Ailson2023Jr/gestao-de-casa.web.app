@@ -133,17 +133,17 @@ function parseMessage(rawText) {
   const norm = normalizeText(text);
 
   // 1. INTENÇÃO: AJUDA / MENU
-  if (['ajuda', 'menu', 'oi', 'ola', 'ola bot', 'start', 'comandos'].includes(norm)) {
+  if (['ajuda', 'menu', 'oi', 'ola', 'ola bot', 'start', 'comandos', 'help', '?'].includes(norm) || norm.includes('ajuda') || norm.includes('comandos')) {
     return { type: 'help' };
   }
 
   // 1.1 INTENÇÃO: ENVIAR LINK DO SISTEMA
-  if (['link', 'site', 'painel', 'sistema', 'app', 'web', 'url'].includes(norm) || norm === 'mandar o link' || norm === 'manda o link') {
+  if (['link', 'site', 'painel', 'sistema', 'app', 'web', 'url'].includes(norm) || norm.includes('link') || norm.includes('painel')) {
     return { type: 'link' };
   }
 
   // 2. INTENÇÃO: CONSULTAR SALDO OU RESUMO
-  if (['saldo', 'resumo', 'como estamos', 'status', 'relatorio'].includes(norm)) {
+  if (['saldo', 'resumo', 'como estamos', 'status', 'relatorio'].includes(norm) || norm.includes('saldo') || norm.includes('resumo')) {
     return { type: 'summary' };
   }
 
@@ -153,7 +153,8 @@ function parseMessage(rawText) {
     norm.includes('vencem') ||
     norm.includes('vencendo') ||
     norm.includes('pendentes') ||
-    norm.includes('o que falta')
+    norm.includes('o que falta') ||
+    norm.includes('a pagar')
   ) {
     return { type: 'list_pending' };
   }

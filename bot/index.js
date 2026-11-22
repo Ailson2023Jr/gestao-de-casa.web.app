@@ -154,7 +154,8 @@ async function startBot() {
 
   // Escuta novas mensagens recebidas
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return;
+    // Processa tanto mensagens recebidas de outros ('notify') quanto mensagens enviadas pelo próprio celular do usuário ('append')
+    if (type !== 'notify' && type !== 'append') return;
 
     for (const msg of messages) {
       // Extrai texto da mensagem
@@ -188,7 +189,7 @@ async function startBot() {
         senderName = getSenderName(participantJid, pushName);
       }
 
-      console.log(`💬 Mensagem identificada de [${senderName}] (fromMe: ${msg.key.fromMe}): "${rawText}"`);
+      console.log(`💬 Mensagem identificada de [${senderName}] (tipo: ${type}, fromMe: ${msg.key.fromMe}): "${rawText}"`);
 
       // Analisa intenção da mensagem
       const parsed = parseMessage(rawText);
