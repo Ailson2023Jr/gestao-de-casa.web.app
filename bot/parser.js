@@ -30,15 +30,19 @@ function detectCategory(description) {
 
 /**
  * Extrai valor monetário de um texto (ex: "R$ 150,50", "150.50", "150", "150,00", "R$2400")
- * Ignora números ordinais como 1°, 2°, 1ª, etc.
+ * Ignora números ordinais e identificadores de parcelas como 1°, 2°, 2ª, "2 parcela", "1/3"
  */
 function extractAmount(text) {
   if (!text) return null;
 
-  // 1. Remove números ordinais para não confundir com valores (ex: "2° parcela", "1ª prestação")
-  const clean = text.replace(/\b\d+\s*[°ºª]/gi, ' ');
+  // 1. Remove números ordinais e referências a parcelas (ex: "2°", "2ª", "2 parcela", "parcela 2", "1/3")
+  let clean = text
+    .replace(/\b\d+\s*[°ºª]\b/gi, ' ')
+    .replace(/\b\d+\s*(?:parcela|prestacao|prestação|vezes|x)\b/gi, ' ')
+    .replace(/\b(?:parcela|prestacao|prestação)\s*\d+\b/gi, ' ')
+    .replace(/\b\d+\s*\/\s*\d+\b/g, ' ');
 
-  // 2. Busca com prioridade valores acompanhados de 'R$' ou 'reais'
+  // 2. Busca com prioridade máxima valores acompanhados de 'R$' ou 'reais'
   const currencyMatch = clean.match(/r\$\s*(\d+(?:[.,]\d{1,2})?)/i) ||
                         clean.match(/(\d+(?:[.,]\d{1,2})?)\s*(?:reais|real)/i);
   if (currencyMatch) {
@@ -46,16 +50,20 @@ function extractAmount(text) {
     if (!isNaN(val) && val > 0) return val;
   }
 
-  // 3. Se não tiver 'R$', remove datas no formato DD/MM/AAAA ou DD/MM e 'dia X' antes de procurar números
+  // 3. Remove datas no formato DD/MM/AAAA ou DD/MM e 'dia X' antes de procurar números soltos
   const noDates = clean
     .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, ' ')
     .replace(/(?:dia|vencimento|vence)\s*\d{1,2}/gi, ' ');
 
-  // 4. Procura qualquer número restante
-  const numberMatch = noDates.match(/\b(\d+(?:[.,]\d{1,2})?)\b/);
-  if (numberMatch) {
-    const val = parseFloat(numberMatch[1].replace(',', '.'));
-    if (!isNaN(val) && val > 0) return val;
+  // 4. Se houver números soltos, procura todos os números válidos
+  const matches = [...noDates.matchAll(/\b(\d+(?:[.,]\d{1,2})?)\b/g)];
+  if (matches.length > 0) {
+    const numbers = matches.map(m => parseFloat(m[1].replace(',', '.'))).filter(n => !isNaN(n) && n > 0);
+    if (numbers.length > 0) {
+      // Se houver múltiplos números, prioriza o maior (evita pegar índices menores como valores)
+      numbers.sort((a, b) => b - a);
+      return numbers[0];
+    }
   }
 
   return null;
@@ -101,7 +109,6 @@ function extractDueDate(text) {
   if (dayMatch) {
     const day = parseInt(dayMatch[1], 10);
     if (day >= 1 && day <= 31) {
-      // Se o dia informado já passou muito neste mês, agenda para o próximo mês
       let targetMonth = currentMonth;
       let targetYear = currentYear;
       if (day < now.getDate() - 3) {
@@ -133,69 +140,88 @@ function parseMessage(rawText) {
   const norm = normalizeText(text);
 
   // 1. INTENÇÃO: AJUDA / MENU
-  if (['ajuda', 'menu', 'oi', 'ola', 'ola bot', 'start', 'comandos', 'help', '?'].includes(norm) || norm.includes('ajuda') || norm.includes('comandos')) {
+  if (
+    ['ajuda', 'menu', 'oi', 'ola', 'ola bot', 'start', 'comandos', 'help', '?'].includes(norm) ||
+    norm === 'ajuda' ||
+    norm === 'comandos' ||
+    norm === 'menu'
+  ) {
     return { type: 'help' };
   }
 
   // 1.1 INTENÇÃO: ENVIAR LINK DO SISTEMA
-  if (['link', 'site', 'painel', 'sistema', 'app', 'web', 'url'].includes(norm) || norm.includes('link') || norm.includes('painel')) {
+  if (
+    ['link', 'site', 'painel', 'sistema', 'app', 'web', 'url'].includes(norm) ||
+    norm === 'link' ||
+    norm === 'painel' ||
+    norm === 'sistema'
+  ) {
     return { type: 'link' };
   }
 
   // 2. INTENÇÃO: CONSULTAR SALDO OU RESUMO
-  if (['saldo', 'resumo', 'como estamos', 'status', 'relatorio'].includes(norm) || norm.includes('saldo') || norm.includes('resumo')) {
+  if (
+    ['saldo', 'resumo', 'como estamos', 'status', 'relatorio'].includes(norm) ||
+    norm === 'saldo' ||
+    norm === 'resumo'
+  ) {
     return { type: 'summary' };
   }
 
   // 3. INTENÇÃO: CONSULTAR CONTAS A VENCER
   if (
-    norm.includes('contas') ||
-    norm.includes('vencem') ||
-    norm.includes('vencendo') ||
-    norm.includes('pendentes') ||
-    norm.includes('o que falta') ||
-    norm.includes('a pagar')
+    norm === 'contas' ||
+    norm === 'contas a pagar' ||
+    norm === 'o que falta' ||
+    norm.includes('contas pendentes') ||
+    norm.includes('quais contas') ||
+    norm.includes('vencem hoje')
   ) {
     return { type: 'list_pending' };
   }
 
   // 4. INTENÇÃO: MARCAR CONTA COMO PAGA
-  // Padrões:
-  // "paguei a luz", "paguei o condominio", "paguei conta x", "paguei x"
-  // "luz paga", "condominio pago", "cartão pago", "conta x paga"
-  const payRegex1 = /^paguei(?:\s+a|\s+o|\s+minha|\s+a\s+conta|\s+o\s+boleto|\s+conta)?\s+(.+)$/i;
-  const payRegex2 = /^(.+?)\s+(?:pago|paga|liquidado|quitado|liquidada|quitada)$/i;
+  // Cobre:
+  // - "paguei a claro", "paguei o condomínio", "paguei internet"
+  // - "claro paga", "condominio pago", "cartao pago"
+  // - "conta paga claro", "conta paga: claro", "conta claro paga"
+  // - "dar baixa claro", "baixar conta luz"
+  const isPaidIntent = (
+    norm.includes('paga') ||
+    norm.includes('pago') ||
+    norm.includes('paguei') ||
+    norm.includes('liquidad') ||
+    norm.includes('quitad') ||
+    norm.startsWith('baixar') ||
+    norm.startsWith('baixa') ||
+    norm.startsWith('dar baixa')
+  ) && !norm.startsWith('adicionar') && !norm.startsWith('nova') && !norm.startsWith('cadastrar');
 
-  const matchPay1 = text.match(payRegex1);
-  const matchPay2 = text.match(payRegex2);
+  if (isPaidIntent) {
+    let cleanAccount = text
+      .replace(/^(dar\s+baixa|baixar|baixa|conta\s+paga|conta\s+pago|conta\s+liquidada|paguei\s+(?:a\s+|o\s+|minha\s+|a\s+conta\s+|o\s+boleto\s+|conta\s+)?|pago\s+|paga\s+)\s*[:.-]?\s*/i, '')
+      .replace(/\s*(?:paga|pago|liquidado|liquidada|quitado|quitada|foi\s+paga|ta\s+paga|tá\s+pago)$/i, '')
+      .replace(/^(?:a\s+|o\s+|conta\s+(?:de\s+|da\s+|do\s+)?)/i, '')
+      .trim();
 
-  if (matchPay1 && matchPay1[1]) {
-    return {
-      type: 'mark_paid',
-      accountQuery: matchPay1[1].trim()
-    };
-  }
-
-  if (matchPay2 && matchPay2[1]) {
-    // Evita falsos positivos com frases genéricas
-    const query = matchPay2[1].replace(/^(a\s+|o\s+|conta\s+(?:de\s+|da\s+|do\s+)?)/i, '').trim();
-    if (query.length >= 2) {
+    if (cleanAccount.length >= 2) {
       return {
         type: 'mark_paid',
-        accountQuery: query
+        accountQuery: cleanAccount
       };
     }
   }
 
   // 5. INTENÇÃO: CADASTRAR NOVA RECEITA
   // Padrões: "adicionar receita...", "nova receita...", "receita...", "recebi...", "salario...", "ganhei..."
-  const isIncomeCommand = norm.includes('receita') ||
+  const isIncomeCommand = norm.startsWith('receita') ||
                           norm.startsWith('adicionar receita') ||
                           norm.startsWith('nova receita') ||
                           norm.startsWith('recebi') ||
                           norm.startsWith('salario') ||
                           norm.startsWith('ganhei') ||
-                          norm.startsWith('renda');
+                          norm.startsWith('renda') ||
+                          (norm.includes('receita') && (norm.includes('r$') || /\b\d+\b/.test(norm)));
 
   if (isIncomeCommand) {
     let cleanText = text
@@ -212,9 +238,10 @@ function parseMessage(rawText) {
 
     const incomeDate = extractDueDate(cleanText);
 
-    // Isola descrição da receita
+    // Isola descrição da receita removendo o valor e datas
     let description = cleanText
       .replace(/r\$\s*(\d+(?:[.,]\d{1,2})?)/gi, '')
+      .replace(new RegExp(`\\b${String(amount).replace('.', '[.,]')}\\b`, 'g'), '')
       .replace(/\b(\d+(?:[.,]\d{1,2})?)\s*(?:reais|real)\b/gi, '')
       .replace(/(?:dia|vencimento|vence)\s*\d{1,2}(?:\/\d{1,2}(?:\/\d{2,4})?)?/gi, '')
       .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, '')
@@ -252,15 +279,19 @@ function parseMessage(rawText) {
   // "cadastrar conta luz 150 dia 25"
   // "nova conta internet 120 28/11"
   // "conta mercado 350 dia 22"
-  const isAddCommand = norm.startsWith('cadastrar') || norm.startsWith('nova conta') || norm.startsWith('adicionar conta') || norm.startsWith('adicionar despesa') || norm.startsWith('conta') || norm.startsWith('gastei') || norm.startsWith('comprei');
+  const isAddCommand = norm.startsWith('cadastrar') ||
+                       norm.startsWith('nova conta') ||
+                       norm.startsWith('adicionar conta') ||
+                       norm.startsWith('adicionar despesa') ||
+                       norm.startsWith('conta ') ||
+                       norm.startsWith('gastei') ||
+                       norm.startsWith('comprei');
 
   if (isAddCommand) {
-    // Limpa prefixos
     let cleanText = text
       .replace(/^(cadastrar\s+conta|cadastrar\s+despesa|cadastrar|nova\s+conta|nova\s+despesa|adicionar\s+conta|adicionar\s+despesa|adicionar|conta|gastei|comprei)\s*[.:-]?\s*/i, '')
       .trim();
 
-    // Extrai valor
     const amount = extractAmount(cleanText) || extractAmount(text);
     if (!amount) {
       return {
@@ -269,12 +300,12 @@ function parseMessage(rawText) {
       };
     }
 
-    // Extrai data
     const dueDate = extractDueDate(cleanText);
 
     // Remove do texto o valor e a data para isolar a descrição da conta
     let description = cleanText
       .replace(/r\$\s*(\d+(?:[.,]\d{1,2})?)/gi, '')
+      .replace(new RegExp(`\\b${String(amount).replace('.', '[.,]')}\\b`, 'g'), '')
       .replace(/\b(\d+(?:[.,]\d{1,2})?)\s*(?:reais|real)\b/gi, '')
       .replace(/(?:dia|vencimento|vence)\s*\d{1,2}(?:\/\d{1,2}(?:\/\d{2,4})?)?/gi, '')
       .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, '')
@@ -285,7 +316,6 @@ function parseMessage(rawText) {
     if (!description || description.length < 2) {
       description = 'Despesa cadastrada via WhatsApp';
     } else {
-      // Capitaliza primeira letra
       description = description.charAt(0).toUpperCase() + description.slice(1);
     }
 
@@ -303,7 +333,6 @@ function parseMessage(rawText) {
     };
   }
 
-  // Não reconhecido
   return {
     type: 'unknown',
     rawText: text

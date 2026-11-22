@@ -24,6 +24,7 @@ if (!fs.existsSync(AUTH_DIR)) {
 
 let sock = null;
 let activeGroupJid = config.familyGroupId || null;
+const botStartTime = Math.floor(Date.now() / 1000);
 
 /**
  * Identifica o nome de quem enviou a mensagem (Junior, Bia ou Família)
@@ -35,6 +36,26 @@ function getSenderName(participantJid, pushName) {
     return config.users[cleanPhone];
   }
   return pushName || 'Família';
+}
+
+/**
+ * Extrai recursivamente o texto de qualquer tipo de mensagem do WhatsApp
+ * Suporta texto direto, extendedTextMessage, mensagens efêmeras (temporárias),
+ * view-once, legendas de imagens/vídeos/documentos.
+ */
+function extractMessageText(m) {
+  if (!m) return '';
+  if (typeof m === 'string') return m;
+  if (m.conversation) return m.conversation;
+  if (m.extendedTextMessage?.text) return m.extendedTextMessage.text;
+  if (m.imageMessage?.caption) return m.imageMessage.caption;
+  if (m.videoMessage?.caption) return m.videoMessage.caption;
+  if (m.documentMessage?.caption) return m.documentMessage.caption;
+  if (m.ephemeralMessage?.message) return extractMessageText(m.ephemeralMessage.message);
+  if (m.viewOnceMessage?.message) return extractMessageText(m.viewOnceMessage.message);
+  if (m.viewOnceMessageV2?.message) return extractMessageText(m.viewOnceMessageV2.message);
+  if (m.documentWithCaptionMessage?.message) return extractMessageText(m.documentWithCaptionMessage.message);
+  return '';
 }
 
 /**
@@ -149,21 +170,28 @@ async function startBot() {
           () => activeGroupJid
         );
       }
+
+      // Envia confirmação visual no grupo para que os usuários saibam que está pronto
+      if (activeGroupJid) {
+        try {
+          await sock.sendMessage(activeGroupJid, {
+            text: `🤖 *[Gestão de Casa]*\n\n✅ Assistente online e pronto para receber comandos aqui no grupo!\n\n💡 Mande *saldo*, *contas*, *link* ou *ajuda* para ver as informações.`
+          });
+          console.log('📢 Mensagem de ativação enviada com sucesso no grupo familiar!');
+        } catch (err) {
+          console.error('Aviso ao enviar mensagem de ativação:', err.message);
+        }
+      }
     }
   });
 
-  // Escuta novas mensagens recebidas
+  // Escuta todas as mensagens recebidas
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    // Processa tanto mensagens recebidas de outros ('notify') quanto mensagens enviadas pelo próprio celular do usuário ('append')
-    if (type !== 'notify' && type !== 'append') return;
+    if (!messages || !Array.isArray(messages)) return;
 
     for (const msg of messages) {
-      // Extrai texto da mensagem
-      const rawText = msg.message?.conversation ||
-                      msg.message?.extendedTextMessage?.text ||
-                      msg.message?.imageMessage?.caption ||
-                      '';
-
+      // Extrai texto de qualquer estrutura de mensagem
+      const rawText = extractMessageText(msg.message);
       if (!rawText || typeof rawText !== 'string') continue;
 
       // Se a mensagem começar com o prefixo do próprio bot, ignora para nunca entrar em loop
@@ -171,28 +199,39 @@ async function startBot() {
         continue;
       }
 
-      const remoteJid = msg.key.remoteJid;
-      const isGroup = remoteJid.endsWith('@g.us');
-
-      // Se for mensagem em grupo e tivermos grupo familiar configurado, só escuta no grupo da família
-      if (isGroup && activeGroupJid && remoteJid !== activeGroupJid) {
+      // Ignora mensagens enviadas há mais de 2 minutos antes do bot iniciar
+      const msgTimestamp = Number(msg.messageTimestamp) || 0;
+      if (msgTimestamp > 0 && msgTimestamp < (botStartTime - 120)) {
         continue;
       }
 
-      // Identifica quem enviou a mensagem (se fromMe for true, foi enviado pelo próprio Junior)
+      const remoteJid = msg.key?.remoteJid || '';
+      const isGroup = remoteJid.endsWith('@g.us');
+      const isFamilyGroup = isGroup && (remoteJid === config.familyGroupId || remoteJid.includes('120363430925230357'));
+
+      // Se for mensagem em grupo e NÃO for o grupo de Finanças da Casa, ignora
+      if (isGroup && !isFamilyGroup) {
+        continue;
+      }
+
+      // Identifica quem enviou a mensagem
       let senderName = 'Família';
       if (msg.key.fromMe) {
         senderName = 'Junior';
       } else {
-        const participantJid = isGroup ? msg.key.participant : remoteJid;
+        const participantJid = isGroup ? (msg.key.participant || '') : remoteJid;
         const pushName = msg.pushName || '';
         senderName = getSenderName(participantJid, pushName);
       }
 
-      console.log(`💬 Mensagem identificada de [${senderName}] (tipo: ${type}, fromMe: ${msg.key.fromMe}): "${rawText}"`);
+      console.log(`💬 [${new Date().toLocaleTimeString('pt-BR')}] Mensagem de [${senderName}] em [${isGroup ? 'Grupo' : 'Privado'}] (tipo: ${type}, fromMe: ${Boolean(msg.key.fromMe)}): "${rawText}"`);
 
       // Analisa intenção da mensagem
       const parsed = parseMessage(rawText);
+      if (parsed.type === 'unknown') {
+        // Se não for um comando ou intenção válida, ignora silenciosamente para não poluir
+        continue;
+      }
 
       try {
         const botPrefix = `🤖 *[Gestão de Casa]*\n\n`;
@@ -208,6 +247,7 @@ async function startBot() {
               reply += `📊 *Saldo livre restante:* ${database.formatMoney(summary.balance)}\n`;
               reply += `⏳ *Contas pendentes restantes:* ${summary.pendingCount}`;
               await sock.sendMessage(remoteJid, { text: reply });
+              console.log(`🤖 [Gestão de Casa] Conta paga respondida para [${senderName}]`);
             } else {
               let reply = `${botPrefix}⚠️ *${senderName}*, ${res.reason}\n`;
               if (res.availablePending && res.availablePending.length > 0) {
@@ -217,6 +257,7 @@ async function startBot() {
                 });
               }
               await sock.sendMessage(remoteJid, { text: reply });
+              console.log(`🤖 [Gestão de Casa] Conta não encontrada respondida para [${senderName}]`);
             }
             break;
           }
@@ -235,6 +276,7 @@ async function startBot() {
               reply += `💵 *Saldo líquido livre:* ${database.formatMoney(summary.balance)}\n\n`;
               reply += `Já está sincronizada em Receitas no painel! 🚀`;
               await sock.sendMessage(remoteJid, { text: reply });
+              console.log(`🤖 [Gestão de Casa] Receita cadastrada respondida para [${senderName}]`);
             }
             break;
           }
@@ -257,11 +299,11 @@ async function startBot() {
               reply += `🏷️ *Categoria:* ${res.expense.category}\n\n`;
               reply += `Já está sincronizada no painel da família! 🚀`;
               await sock.sendMessage(remoteJid, { text: reply });
+              console.log(`🤖 [Gestão de Casa] Despesa cadastrada respondida para [${senderName}]`);
             }
             break;
           }
 
-          // 3. FALTOU VALOR NO CADASTRO
           case 'add_expense_missing_amount': {
             let reply = `${botPrefix}⚠️ *${senderName}*, não consegui identificar o valor em reais da conta.\n`;
             reply += `👉 *Exemplo:* _"conta internet 120 dia 28"_ ou _"cadastrar luz 180 hoje"_`;
@@ -288,6 +330,7 @@ async function startBot() {
 
             reply += `\n💡 Para pagar alguma conta, mande: *"paguei a [nome]"*`;
             await sock.sendMessage(remoteJid, { text: reply });
+            console.log(`🤖 [Gestão de Casa] Lista de contas enviada para [${senderName}]`);
             break;
           }
 
@@ -308,6 +351,7 @@ async function startBot() {
             }
 
             await sock.sendMessage(remoteJid, { text: reply });
+            console.log(`🤖 [Gestão de Casa] Resumo de saldo enviado para [${senderName}]`);
             break;
           }
 
@@ -317,6 +361,7 @@ async function startBot() {
             reply += `👉 Acesse pelo link:\nhttps://gestao-de-casa.web.app/\n\n`;
             reply += `💡 *Dica:* Salve nos favoritos do navegador do seu celular para acesso rápido! 📱`;
             await sock.sendMessage(remoteJid, { text: reply });
+            console.log(`🤖 [Gestão de Casa] Link enviado para [${senderName}]`);
             break;
           }
 
@@ -339,11 +384,11 @@ async function startBot() {
             reply += `  _"saldo"_ ➔ Exibe o resumo de receitas, gastos e saldo livre\n\n`;
             reply += `Todo dia de manhã também envio o alerta automático das contas que vencem no dia ou no dia seguinte! 🔔`;
             await sock.sendMessage(remoteJid, { text: reply });
+            console.log(`🤖 [Gestão de Casa] Ajuda enviada para [${senderName}]`);
             break;
           }
 
           default:
-            // Não responde mensagens aleatórias para não poluir
             break;
         }
       } catch (err) {

@@ -6,10 +6,12 @@ module.exports = {
   // ID exato do grupo no WhatsApp (identificado automaticamente)
   familyGroupId: '120363430925230357@g.us',
 
-  // Mapeamento de telefones para nomes amigáveis (com DDI 55 + DDD + número)
-  // Exemplo: '5548999999999': 'Junior'
+  // Mapeamento de telefones e LIDs para nomes amigáveis
   users: {
-    // Pode ser configurado via variáveis de ambiente ou direto aqui
+    '5515996463522': 'Junior',
+    '92049789472775': 'Junior',
+    '5515996547755': 'Bia',
+    '132358107881475': 'Bia',
     ...(process.env.WHATSAPP_JUNIOR_PHONE ? { [process.env.WHATSAPP_JUNIOR_PHONE.replace(/\D/g, '')]: 'Junior' } : {}),
     ...(process.env.WHATSAPP_BIA_PHONE ? { [process.env.WHATSAPP_BIA_PHONE.replace(/\D/g, '')]: 'Bia' } : {})
   },
