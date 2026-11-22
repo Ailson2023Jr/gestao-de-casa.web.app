@@ -154,6 +154,34 @@ async function addExpense(data) {
 }
 
 /**
+ * Adiciona uma nova receita no Firestore
+ */
+async function addIncome(data) {
+  const firestore = getDb();
+  const now = new Date();
+  const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
+
+  const newDoc = {
+    description: data.description,
+    amount: Number(data.amount),
+    date: data.date || todayStr,
+    category: data.category || 'Salário',
+    recurring: Boolean(data.recurring),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  const docRef = await firestore.collection('incomes').add(newDoc);
+  return {
+    success: true,
+    income: {
+      id: docRef.id,
+      ...newDoc
+    }
+  };
+}
+
+/**
  * Obtém o resumo financeiro atualizado (Receitas, Despesas, Saldo)
  */
 async function getFinancialSummary() {
@@ -203,5 +231,6 @@ module.exports = {
   getExpensesDueSoon,
   markExpenseAsPaid,
   addExpense,
+  addIncome,
   getFinancialSummary
 };

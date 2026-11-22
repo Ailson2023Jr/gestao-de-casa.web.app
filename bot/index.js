@@ -3,7 +3,8 @@ const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
-  fetchLatestBaileysVersion
+  fetchLatestBaileysVersion,
+  Browsers
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const path = require('path');
@@ -88,12 +89,18 @@ async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
 
+  let isReconnecting = false;
+  let schedulerStarted = false;
+
   sock = makeWASocket({
     version,
     logger: pino({ level: 'silent' }),
     auth: state,
-    printQRInTerminal: false, // Nós imprimimos customizado com mensagem amigável
-    browser: ['Gestão de Casa', 'Desktop', '1.0.0']
+    printQRInTerminal: false,
+    browser: Browsers.ubuntu('Chrome'),
+    syncFullHistory: false,
+    markOnlineOnConnect: false,
+    defaultQueryTimeoutMs: 60000
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -113,47 +120,35 @@ async function startBot() {
     }
 
     if (connection === 'close') {
-      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('⚠️ Conexão encerrada. Reconectar?', shouldReconnect ? 'Sim' : 'Não');
-      if (shouldReconnect) {
-        setTimeout(startBot, 3000);
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+      console.log(`⚠️ Conexão encerrada (Status: ${statusCode || 'desconhecido'}). Reconectar? ${shouldReconnect ? 'Sim' : 'Não'}`);
+
+      if (shouldReconnect && !isReconnecting) {
+        isReconnecting = true;
+        setTimeout(() => {
+          isReconnecting = false;
+          startBot();
+        }, 5000);
       }
     } else if (connection === 'open') {
       console.log('\n🎉 =======================================================');
       console.log('✅ Assistente Gestão de Casa CONECTADO COM SUCESSO!');
+      console.log(`🏠 Grupo ativo: "${config.familyGroupName}" (${config.familyGroupId})`);
       console.log('🎉 =======================================================\n');
 
-      // Procura o grupo da família
-      try {
-        const chats = await sock.groupFetchAllParticipating();
-        const groups = Object.values(chats);
-        console.log(`📋 Total de grupos em que o bot está participando: ${groups.length}`);
+      activeGroupJid = config.familyGroupId;
 
-        const foundGroup = groups.find(g =>
-          g.subject.toLowerCase().includes(config.familyGroupName.toLowerCase())
+      // Inicia agendador diário de vencimentos uma única vez
+      if (!schedulerStarted) {
+        schedulerStarted = true;
+        startDailyScheduler(
+          async (jid, text) => {
+            if (sock) await sock.sendMessage(jid, { text });
+          },
+          () => activeGroupJid
         );
-
-        if (foundGroup) {
-          activeGroupJid = foundGroup.id;
-          console.log(`🏠 Grupo da família identificado: "${foundGroup.subject}" (ID: ${activeGroupJid})`);
-        } else {
-          console.log(`⚠️ Grupo "${config.familyGroupName}" não foi encontrado automaticamente.`);
-          console.log('👉 Crie um grupo no WhatsApp com o nome "Finanças da Casa", adicione você, a Bia e o bot!');
-          if (groups.length > 0) {
-            console.log('Grupos disponíveis:', groups.map(g => `"${g.subject}"`).join(', '));
-          }
-        }
-      } catch (err) {
-        console.error('Erro ao listar grupos:', err.message);
       }
-
-      // Inicia agendador diário de vencimentos
-      startDailyScheduler(
-        async (jid, text) => {
-          if (sock) await sock.sendMessage(jid, { text });
-        },
-        () => activeGroupJid
-      );
     }
   });
 
@@ -162,24 +157,6 @@ async function startBot() {
     if (type !== 'notify') return;
 
     for (const msg of messages) {
-      // Ignora mensagens enviadas pelo próprio bot
-      if (msg.key.fromMe) continue;
-
-      const remoteJid = msg.key.remoteJid;
-      const isGroup = remoteJid.endsWith('@g.us');
-
-      // Se tiver grupo ativo configurado, foca no grupo ou permite chats diretos
-      if (activeGroupJid && isGroup && remoteJid !== activeGroupJid) {
-        // Ignora grupos aleatórios que não sejam o de finanças
-        continue;
-      }
-
-      // Se ainda não temos o grupo configurado e a mensagem veio de um grupo cujo nome é "Finanças da Casa"
-      if (!activeGroupJid && isGroup) {
-        activeGroupJid = remoteJid;
-        console.log(`🏠 Definindo grupo ativo automaticamente: ${activeGroupJid}`);
-      }
-
       // Extrai texto da mensagem
       const rawText = msg.message?.conversation ||
                       msg.message?.extendedTextMessage?.text ||
@@ -188,29 +165,50 @@ async function startBot() {
 
       if (!rawText || typeof rawText !== 'string') continue;
 
-      const participantJid = isGroup ? msg.key.participant : remoteJid;
-      const pushName = msg.pushName || '';
-      const senderName = getSenderName(participantJid, pushName);
+      // Se a mensagem começar com o prefixo do próprio bot, ignora para nunca entrar em loop
+      if (rawText.startsWith('🤖')) {
+        continue;
+      }
 
-      console.log(`💬 Mensagem recebida de [${senderName}]: "${rawText}"`);
+      const remoteJid = msg.key.remoteJid;
+      const isGroup = remoteJid.endsWith('@g.us');
 
-      // Analisa intenção
+      // Se for mensagem em grupo e tivermos grupo familiar configurado, só escuta no grupo da família
+      if (isGroup && activeGroupJid && remoteJid !== activeGroupJid) {
+        continue;
+      }
+
+      // Identifica quem enviou a mensagem (se fromMe for true, foi enviado pelo próprio Junior)
+      let senderName = 'Família';
+      if (msg.key.fromMe) {
+        senderName = 'Junior';
+      } else {
+        const participantJid = isGroup ? msg.key.participant : remoteJid;
+        const pushName = msg.pushName || '';
+        senderName = getSenderName(participantJid, pushName);
+      }
+
+      console.log(`💬 Mensagem identificada de [${senderName}] (fromMe: ${msg.key.fromMe}): "${rawText}"`);
+
+      // Analisa intenção da mensagem
       const parsed = parseMessage(rawText);
 
       try {
+        const botPrefix = `🤖 *[Gestão de Casa]*\n\n`;
+
         switch (parsed.type) {
           // 1. MARCAR CONTA COMO PAGA
           case 'mark_paid': {
             const res = await database.markExpenseAsPaid(parsed.accountQuery);
             if (res.success) {
               const summary = await database.getFinancialSummary();
-              let reply = `🎉 *Boa, ${senderName}!* 👏\n\n`;
+              let reply = `${botPrefix}🎉 *Boa, ${senderName}!* 👏\n\n`;
               reply += `✅ A conta *"${res.expense.description}"* (${database.formatMoney(res.expense.amount)}) foi marcada como *PAGA* no sistema!\n\n`;
               reply += `📊 *Saldo livre restante:* ${database.formatMoney(summary.balance)}\n`;
               reply += `⏳ *Contas pendentes restantes:* ${summary.pendingCount}`;
               await sock.sendMessage(remoteJid, { text: reply });
             } else {
-              let reply = `⚠️ *${senderName}*, ${res.reason}\n`;
+              let reply = `${botPrefix}⚠️ *${senderName}*, ${res.reason}\n`;
               if (res.availablePending && res.availablePending.length > 0) {
                 reply += `\n📋 *Contas que estão pendentes no momento:*\n`;
                 res.availablePending.forEach(p => {
@@ -222,11 +220,36 @@ async function startBot() {
             break;
           }
 
-          // 2. CADASTRAR NOVA CONTA
+          // 2. CADASTRAR NOVA RECEITA
+          case 'add_income': {
+            const res = await database.addIncome(parsed.data);
+            if (res.success) {
+              const summary = await database.getFinancialSummary();
+              let reply = `${botPrefix}✅ *Receita cadastrada com sucesso por ${senderName}!* 💰\n\n`;
+              reply += `📌 *Descrição:* ${res.income.description}\n`;
+              reply += `💵 *Valor:* ${database.formatMoney(res.income.amount)}\n`;
+              reply += `📅 *Data:* ${res.income.date}\n`;
+              reply += `🏷️ *Categoria:* ${res.income.category}\n\n`;
+              reply += `📊 *Receita total da casa:* ${database.formatMoney(summary.totalIncome)}\n`;
+              reply += `💵 *Saldo líquido livre:* ${database.formatMoney(summary.balance)}\n\n`;
+              reply += `Já está sincronizada em Receitas no painel! 🚀`;
+              await sock.sendMessage(remoteJid, { text: reply });
+            }
+            break;
+          }
+
+          case 'add_income_missing_amount': {
+            let reply = `${botPrefix}⚠️ *${senderName}*, não consegui identificar o valor em reais da receita.\n`;
+            reply += `👉 *Exemplo:* _"receita décimo terceiro 2400"_ ou _"adicionar receita freelance 500"_`;
+            await sock.sendMessage(remoteJid, { text: reply });
+            break;
+          }
+
+          // 3. CADASTRAR NOVA CONTA / DESPESA
           case 'add_expense': {
             const res = await database.addExpense(parsed.data);
             if (res.success) {
-              let reply = `✅ *Conta cadastrada com sucesso por ${senderName}!* 📝\n\n`;
+              let reply = `${botPrefix}✅ *Conta cadastrada com sucesso por ${senderName}!* 📝\n\n`;
               reply += `📌 *Descrição:* ${res.expense.description}\n`;
               reply += `💰 *Valor:* ${database.formatMoney(res.expense.amount)}\n`;
               reply += `📅 *Vencimento:* ${res.expense.dueDate}\n`;
@@ -239,7 +262,7 @@ async function startBot() {
 
           // 3. FALTOU VALOR NO CADASTRO
           case 'add_expense_missing_amount': {
-            let reply = `⚠️ *${senderName}*, não consegui identificar o valor em reais da conta.\n`;
+            let reply = `${botPrefix}⚠️ *${senderName}*, não consegui identificar o valor em reais da conta.\n`;
             reply += `👉 *Exemplo:* _"conta internet 120 dia 28"_ ou _"cadastrar luz 180 hoje"_`;
             await sock.sendMessage(remoteJid, { text: reply });
             break;
@@ -249,11 +272,11 @@ async function startBot() {
           case 'list_pending': {
             const pending = await database.getPendingExpenses();
             if (pending.length === 0) {
-              await sock.sendMessage(remoteJid, { text: `🎉 *Tudo em dia, ${senderName}!* Não há nenhuma conta pendente no momento!` });
+              await sock.sendMessage(remoteJid, { text: `${botPrefix}🎉 *Tudo em dia, ${senderName}!* Não há nenhuma conta pendente no momento!` });
               break;
             }
 
-            let reply = `📋 *Contas Pendentes - Gestão de Casa* 🏠\n`;
+            let reply = `${botPrefix}📋 *Contas Pendentes - Gestão de Casa* 🏠\n`;
             pending.slice(0, 8).forEach(exp => {
               reply += `\n• *${exp.description}*: ${database.formatMoney(exp.amount)}\n`;
               reply += `  📅 Vencimento: ${exp.dueDate} (${exp.category || 'Geral'})\n`;
@@ -270,7 +293,7 @@ async function startBot() {
           // 5. CONSULTAR RESUMO / SALDO
           case 'summary': {
             const sum = await database.getFinancialSummary();
-            let reply = `📊 *Resumo Financeiro da Família* 🏠\n\n`;
+            let reply = `${botPrefix}📊 *Resumo Financeiro da Família* 🏠\n\n`;
             reply += `💰 *Receita Total:* ${database.formatMoney(sum.totalIncome)}\n`;
             reply += `📉 *Débitos Totais:* ${database.formatMoney(sum.totalExpense)} (${sum.expensePercent.toFixed(1)}% da renda)\n`;
             reply += `✅ *Já Pago:* ${database.formatMoney(sum.totalPaid)}\n`;
@@ -289,7 +312,7 @@ async function startBot() {
 
           // 6. AJUDA / MENU
           case 'help': {
-            let reply = `👋 *Olá, ${senderName}! Sou o Assistente do Gestão de Casa.* 🤖\n\n`;
+            let reply = `${botPrefix}👋 *Olá, ${senderName}! Sou o Assistente do Gestão de Casa.* 🤖\n\n`;
             reply += `Vocês podem interagir comigo enviando frases naturais aqui no grupo:\n\n`;
             reply += `👉 *Dar baixa em conta paga:*\n`;
             reply += `  _"paguei a luz"_\n`;
@@ -306,7 +329,7 @@ async function startBot() {
           }
 
           default:
-            // Não responde mensagens aleatórias em grupo para não poluir a conversa
+            // Não responde mensagens aleatórias para não poluir
             break;
         }
       } catch (err) {

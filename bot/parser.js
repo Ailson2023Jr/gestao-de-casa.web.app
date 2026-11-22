@@ -29,15 +29,36 @@ function detectCategory(description) {
 }
 
 /**
- * Extrai valor monetário de um texto (ex: "R$ 150,50", "150.50", "150", "150,00")
+ * Extrai valor monetário de um texto (ex: "R$ 150,50", "150.50", "150", "150,00", "R$2400")
+ * Ignora números ordinais como 1°, 2°, 1ª, etc.
  */
 function extractAmount(text) {
-  // Procura padrão monetário: R$ 150,00 ou 150,00 ou 150.00 ou 150
-  const match = text.match(/(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i);
-  if (!match) return null;
-  const numStr = match[1].replace(',', '.');
-  const val = parseFloat(numStr);
-  return isNaN(val) || val <= 0 ? null : val;
+  if (!text) return null;
+
+  // 1. Remove números ordinais para não confundir com valores (ex: "2° parcela", "1ª prestação")
+  const clean = text.replace(/\b\d+\s*[°ºª]/gi, ' ');
+
+  // 2. Busca com prioridade valores acompanhados de 'R$' ou 'reais'
+  const currencyMatch = clean.match(/r\$\s*(\d+(?:[.,]\d{1,2})?)/i) ||
+                        clean.match(/(\d+(?:[.,]\d{1,2})?)\s*(?:reais|real)/i);
+  if (currencyMatch) {
+    const val = parseFloat(currencyMatch[1].replace(',', '.'));
+    if (!isNaN(val) && val > 0) return val;
+  }
+
+  // 3. Se não tiver 'R$', remove datas no formato DD/MM/AAAA ou DD/MM e 'dia X' antes de procurar números
+  const noDates = clean
+    .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, ' ')
+    .replace(/(?:dia|vencimento|vence)\s*\d{1,2}/gi, ' ');
+
+  // 4. Procura qualquer número restante
+  const numberMatch = noDates.match(/\b(\d+(?:[.,]\d{1,2})?)\b/);
+  if (numberMatch) {
+    const val = parseFloat(numberMatch[1].replace(',', '.'));
+    if (!isNaN(val) && val > 0) return val;
+  }
+
+  return null;
 }
 
 /**
@@ -160,21 +181,81 @@ function parseMessage(rawText) {
     }
   }
 
-  // 5. INTENÇÃO: CADASTRAR NOVA CONTA
+  // 5. INTENÇÃO: CADASTRAR NOVA RECEITA
+  // Padrões: "adicionar receita...", "nova receita...", "receita...", "recebi...", "salario...", "ganhei..."
+  const isIncomeCommand = norm.includes('receita') ||
+                          norm.startsWith('adicionar receita') ||
+                          norm.startsWith('nova receita') ||
+                          norm.startsWith('recebi') ||
+                          norm.startsWith('salario') ||
+                          norm.startsWith('ganhei') ||
+                          norm.startsWith('renda');
+
+  if (isIncomeCommand) {
+    let cleanText = text
+      .replace(/^(adicionar\s+receita|nova\s+receita|receita|recebi|salario|ganhei|adicionar|nova)\s*[.:-]?\s*/i, '')
+      .trim();
+
+    const amount = extractAmount(cleanText) || extractAmount(text);
+    if (!amount) {
+      return {
+        type: 'add_income_missing_amount',
+        rawText: text
+      };
+    }
+
+    const incomeDate = extractDueDate(cleanText);
+
+    // Isola descrição da receita
+    let description = cleanText
+      .replace(/r\$\s*(\d+(?:[.,]\d{1,2})?)/gi, '')
+      .replace(/\b(\d+(?:[.,]\d{1,2})?)\s*(?:reais|real)\b/gi, '')
+      .replace(/(?:dia|vencimento|vence)\s*\d{1,2}(?:\/\d{1,2}(?:\/\d{2,4})?)?/gi, '')
+      .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, '')
+      .replace(/\b(hoje|amanha|amanhã)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!description || description.length < 2) {
+      description = 'Receita cadastrada via WhatsApp';
+    } else {
+      description = description.charAt(0).toUpperCase() + description.slice(1);
+    }
+
+    // Categoria da receita: Salário vs Extra
+    let category = 'Salário';
+    const normDesc = normalizeText(description);
+    if (normDesc.includes('extra') || normDesc.includes('venda') || normDesc.includes('freela') || normDesc.includes('3d') || normDesc.includes('bico')) {
+      category = 'Extra';
+    }
+
+    return {
+      type: 'add_income',
+      data: {
+        description,
+        amount,
+        date: incomeDate,
+        category,
+        recurring: false
+      }
+    };
+  }
+
+  // 6. INTENÇÃO: CADASTRAR NOVA CONTA / DESPESA
   // Padrões:
   // "cadastrar conta luz 150 dia 25"
   // "nova conta internet 120 28/11"
   // "conta mercado 350 dia 22"
-  const isAddCommand = norm.startsWith('cadastrar') || norm.startsWith('nova conta') || norm.startsWith('adicionar') || norm.startsWith('conta');
+  const isAddCommand = norm.startsWith('cadastrar') || norm.startsWith('nova conta') || norm.startsWith('adicionar conta') || norm.startsWith('adicionar despesa') || norm.startsWith('conta') || norm.startsWith('gastei') || norm.startsWith('comprei');
 
   if (isAddCommand) {
     // Limpa prefixos
     let cleanText = text
-      .replace(/^(cadastrar\s+conta|cadastrar|nova\s+conta|adicionar\s+conta|adicionar|conta)\s+/i, '')
+      .replace(/^(cadastrar\s+conta|cadastrar\s+despesa|cadastrar|nova\s+conta|nova\s+despesa|adicionar\s+conta|adicionar\s+despesa|adicionar|conta|gastei|comprei)\s*[.:-]?\s*/i, '')
       .trim();
 
     // Extrai valor
-    const amount = extractAmount(cleanText);
+    const amount = extractAmount(cleanText) || extractAmount(text);
     if (!amount) {
       return {
         type: 'add_expense_missing_amount',
@@ -187,7 +268,8 @@ function parseMessage(rawText) {
 
     // Remove do texto o valor e a data para isolar a descrição da conta
     let description = cleanText
-      .replace(/(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i, '')
+      .replace(/r\$\s*(\d+(?:[.,]\d{1,2})?)/gi, '')
+      .replace(/\b(\d+(?:[.,]\d{1,2})?)\s*(?:reais|real)\b/gi, '')
       .replace(/(?:dia|vencimento|vence)\s*\d{1,2}(?:\/\d{1,2}(?:\/\d{2,4})?)?/gi, '')
       .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, '')
       .replace(/\b(hoje|amanha|amanhã)\b/gi, '')

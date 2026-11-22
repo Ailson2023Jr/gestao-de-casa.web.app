@@ -1,12 +1,10 @@
 // Configurações do Bot WhatsApp do Gestão de Casa
 module.exports = {
   // Nome padrão do grupo no WhatsApp onde o bot deve atuar
-  // O bot vai procurar um grupo com esse nome ou que contenha essa palavra
-  familyGroupName: process.env.FAMILY_GROUP_NAME || 'Finanças da Casa',
+  familyGroupName: 'Finanças da Casa',
 
-  // ID do grupo no WhatsApp (ex: 120363028392819283@g.us)
-  // Deixe vazio para o bot auto-detectar o grupo pelo nome acima!
-  familyGroupId: process.env.FAMILY_GROUP_ID || '',
+  // ID exato do grupo no WhatsApp (identificado automaticamente)
+  familyGroupId: '120363430925230357@g.us',
 
   // Mapeamento de telefones para nomes amigáveis (com DDI 55 + DDD + número)
   // Exemplo: '5548999999999': 'Junior'
